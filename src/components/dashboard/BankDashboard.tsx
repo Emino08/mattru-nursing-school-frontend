@@ -1,15 +1,31 @@
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import Payments from '@/pages/bank/Payments';
-import { Button } from '@/components/ui/Button';
-import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
 
 export default function BankDashboard() {
-    const navigate = useNavigate();
+    const { user, loading, isAuthenticated, logout } = useAuth();
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        navigate('/login');
+        logout();
     };
+
+    // Show loading state
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Redirect if user is not authenticated or not a bank user
+    if (!isAuthenticated || !user || user.role !== 'bank') {
+        return <Navigate to="/login" replace />;
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
@@ -21,7 +37,10 @@ export default function BankDashboard() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
-                        <h1 className="text-2xl font-bold" style={{ color: '#2563EB' }}>Bank Portal</h1>
+                        <div>
+                            <h1 className="text-2xl font-bold" style={{ color: '#2563EB' }}>Bank Portal</h1>
+                            <p className="text-sm text-gray-600">Welcome, {user?.email}</p>
+                        </div>
                     </div>
                     <Button
                         onClick={handleLogout}
@@ -29,14 +48,6 @@ export default function BankDashboard() {
                         style={{
                             backgroundColor: '#FF59A1',
                             boxShadow: '0 4px 6px -1px rgba(255, 89, 161, 0.25)'
-                        }}
-                        onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor = '#E0338A';
-                            e.currentTarget.style.boxShadow = '0 8px 9px -4px rgba(255, 89, 161, 0.2), 0 4px 18px 0 rgba(255, 89, 161, 0.1)';
-                        }}
-                        onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor = '#FF59A1';
-                            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(255, 89, 161, 0.25)';
                         }}
                     >
                         Logout
@@ -67,6 +78,7 @@ export default function BankDashboard() {
                 <div className="bg-white rounded-lg shadow-card p-6 animate-fadeIn">
                     <Routes>
                         <Route path="/payments" element={<Payments />} />
+                        <Route path="/" element={<Navigate to="/bank/payments" replace />} />
                     </Routes>
                 </div>
             </main>

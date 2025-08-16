@@ -28,13 +28,13 @@ export default function Analytics() {
     useEffect(() => {
         setIsLoading(true);
         api
-            .get('/api/admin/analytics')
+            .get('/admin/analytics')
             .then((res) => {
                 setData(res.data);
                 setIsLoading(false);
             })
             .catch((error) => {
-                toast({ title: 'Error', description: 'Failed to load analytics data', variant: 'destructive' });
+                toast('Failed to load analytics ');
                 setIsLoading(false);
             });
     }, []);

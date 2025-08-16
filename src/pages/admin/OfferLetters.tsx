@@ -21,7 +21,7 @@ export default function OfferLetters() {
         api
             .get('/admin/applications')
             .then((res) => setOffers(res.data.filter((app: Application) => app.application_status === 'offer_issued')))
-            .catch(() => toast({ title: 'Error', description: 'Failed to load offer letters', variant: 'destructive' }));
+            .catch(() => toast.error('Failed to load offer letters'));
     }, []);
 
     const totalPages = Math.ceil(offers.length / itemsPerPage);

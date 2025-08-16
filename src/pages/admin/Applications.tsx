@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
-import { Button } from '@/components/ui/Button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import api from '@/services/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface Application {
     id: number;
@@ -34,7 +34,7 @@ export default function Applications() {
                 setIsLoading(false);
             })
             .catch(() => {
-                toast({ title: 'Error', description: 'Failed to load applications', variant: 'destructive' });
+                toast.error('Failed to load applications');
                 setIsLoading(false);
             });
     }, []);
@@ -68,9 +68,9 @@ export default function Applications() {
                 app.id === id ? { ...app, application_status: 'interview_scheduled' } : app
             ));
 
-            toast({ title: 'Success', description: 'Interview scheduled successfully' });
+            toast.success('Interview scheduled successfully');
         } catch (error) {
-            toast({ title: 'Error', description: 'Failed to schedule interview', variant: 'destructive' });
+            toast.error('Failed to schedule interview');
         }
     };
 

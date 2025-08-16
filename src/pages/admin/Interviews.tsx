@@ -31,7 +31,7 @@ export default function Interviews() {
                 setIsLoading(false);
             })
             .catch(() => {
-                toast({ title: 'Error', description: 'Failed to load interviews', variant: 'destructive' });
+                toast.error('Failed to load interviews');
                 setIsLoading(false);
             });
     }, []);
@@ -47,9 +47,12 @@ export default function Interviews() {
                     : interview
             ));
 
-            toast({ title: 'Success', description: 'Interview completed and offer issued' });
+            toast.success( 'Interview completed and offer issued', {
+                description: 'The applicant has been notified and the offer letter is ready.'
+            });
         } catch (error) {
-            toast({ title: 'Error', description: 'Failed to complete interview', variant: 'destructive' });
+            toast.error('Failed to complete interview', {
+                description: 'Please try again later or contact support.'});
         }
     };
 

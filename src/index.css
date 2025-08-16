@@ -1,117 +1,117 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-:root {
-    /* Base colors */
-    --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
+/*:root {*/
+/*    !* Base colors *!*/
+/*    --background: 0 0% 100%;*/
+/*    --foreground: 222.2 47.4% 11.2%;*/
 
-    /* Card colors */
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
+/*    !* Card colors *!*/
+/*    --card: 0 0% 100%;*/
+/*    --card-foreground: 222.2 47.4% 11.2%;*/
 
-    /* Popover colors */
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
+/*    !* Popover colors *!*/
+/*    --popover: 0 0% 100%;*/
+/*    --popover-foreground: 222.2 47.4% 11.2%;*/
 
-    /* Primary colors - Blue (#2563EB) */
-    --primary: 217 91% 53%;
-    --primary-foreground: 0 0% 100%;
+/*    !* Primary colors - Blue (#2563EB) *!*/
+/*    --primary: 217 91% 53%;*/
+/*    --primary-foreground: 0 0% 100%;*/
 
-    /* Secondary colors - Pink (#FF59A1) */
-    --secondary: 335 100% 67%;
-    --secondary-foreground: 0 0% 100%;
+/*    !* Secondary colors - Pink (#FF59A1) *!*/
+/*    --secondary: 335 100% 67%;*/
+/*    --secondary-foreground: 0 0% 100%;*/
 
-    /* Muted colors */
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+/*    !* Muted colors *!*/
+/*    --muted: 210 40% 96.1%;*/
+/*    --muted-foreground: 215.4 16.3% 46.9%;*/
 
-    /* Accent colors */
-    --accent: 210 100% 98%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+/*    !* Accent colors *!*/
+/*    --accent: 210 100% 98%;*/
+/*    --accent-foreground: 222.2 47.4% 11.2%;*/
 
-    /* Destructive colors */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+/*    !* Destructive colors *!*/
+/*    --destructive: 0 84.2% 60.2%;*/
+/*    --destructive-foreground: 210 40% 98%;*/
 
-    /* Border and input colors */
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 217 91% 53%;
+/*    !* Border and input colors *!*/
+/*    --border: 214.3 31.8% 91.4%;*/
+/*    --input: 214.3 31.8% 91.4%;*/
+/*    --ring: 217 91% 53%;*/
 
-    /* Border radius */
-    --radius: 0.5rem;
+/*    !* Border radius *!*/
+/*    --radius: 0.5rem;*/
 
-    /* Focus ring width and offset */
-    --ring-width: 2px;
-    --ring-offset: 2px;
-}
+/*    !* Focus ring width and offset *!*/
+/*    --ring-width: 2px;*/
+/*    --ring-offset: 2px;*/
+/*}*/
 
-.dark {
-    --background: 222.2 47.4% 11.2%;
-    --foreground: 210 40% 98%;
+/*.dark {*/
+/*    --background: 222.2 47.4% 11.2%;*/
+/*    --foreground: 210 40% 98%;*/
 
-    --card: 222.2 47.4% 11.2%;
-    --card-foreground: 210 40% 98%;
+/*    --card: 222.2 47.4% 11.2%;*/
+/*    --card-foreground: 210 40% 98%;*/
 
-    --popover: 222.2 47.4% 11.2%;
-    --popover-foreground: 210 40% 98%;
+/*    --popover: 222.2 47.4% 11.2%;*/
+/*    --popover-foreground: 210 40% 98%;*/
 
-    /* Primary colors in dark mode */
-    --primary: 217 91% 53%;
-    --primary-foreground: 0 0% 100%;
+/*    !* Primary colors in dark mode *!*/
+/*    --primary: 217 91% 53%;*/
+/*    --primary-foreground: 0 0% 100%;*/
 
-    /* Secondary colors in dark mode */
-    --secondary: 335 100% 67%;
-    --secondary-foreground: 0 0% 100%;
+/*    !* Secondary colors in dark mode *!*/
+/*    --secondary: 335 100% 67%;*/
+/*    --secondary-foreground: 0 0% 100%;*/
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+/*    --muted: 217.2 32.6% 17.5%;*/
+/*    --muted-foreground: 215 20.2% 65.1%;*/
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+/*    --accent: 217.2 32.6% 17.5%;*/
+/*    --accent-foreground: 210 40% 98%;*/
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+/*    --destructive: 0 62.8% 30.6%;*/
+/*    --destructive-foreground: 210 40% 98%;*/
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224 76% 48%;
-}
+/*    --border: 217.2 32.6% 17.5%;*/
+/*    --input: 217.2 32.6% 17.5%;*/
+/*    --ring: 224 76% 48%;*/
+/*}*/
 
-/* Fix for focus states */
-*:focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
-}
+/*!* Fix for focus states *!*/
+/**:focus-visible {*/
+/*    outline: 2px solid hsl(var(--ring));*/
+/*    outline-offset: 2px;*/
+/*}*/
 
-/* Button style fixes */
-.btn, button, [type='button'], [type='submit'] {
-    position: relative;
-    overflow: hidden;
-}
+/*!* Button style fixes *!*/
+/*.btn, button, [type='button'], [type='submit'] {*/
+/*    position: relative;*/
+/*    overflow: hidden;*/
+/*}*/
 
-/* Label positioning fix */
-label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-}
+/*!* Label positioning fix *!*/
+/*label {*/
+/*    display: block;*/
+/*    margin-bottom: 0.5rem;*/
+/*    font-weight: 500;*/
+/*}*/
 
-/* Input focus state fix */
-input:focus, select:focus, textarea:focus {
-    border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 1px hsl(var(--ring));
-}
+/*!* Input focus state fix *!*/
+/*input:focus, select:focus, textarea:focus {*/
+/*    border-color: hsl(var(--ring));*/
+/*    box-shadow: 0 0 0 1px hsl(var(--ring));*/
+/*}*/
 
-/* Fix input padding */
-.input, input[type="text"], input[type="email"], input[type="password"],
-input[type="date"], input[type="number"], select, textarea {
-    padding: 0.5rem 0.75rem;
-}
-button, [role="button"] {
-    cursor: pointer;
-}
+/*!* Fix input padding *!*/
+/*.input, input[type="text"], input[type="email"], input[type="password"],*/
+/*input[type="date"], input[type="number"], select, textarea {*/
+/*    padding: 0.5rem 0.75rem;*/
+/*}*/
+/*button, [role="button"] {*/
+/*    cursor: pointer;*/
+/*}*/
 /*@import "tailwindcss";*/
 /*@import "tw-animate-css";*/
 

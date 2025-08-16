@@ -1,13 +1,3 @@
-// import MultiStepForm from '@/components/forms/MultiStepForm';
-//
-// export default function Application() {
-//     return (
-//         <div className="space-y-4">
-//             <h2 className="text-xl font-semibold">New Application</h2>
-//             <MultiStepForm />
-//         </div>
-//     );
-// }
 import MultiStepForm from '@/components/forms/MultiStepForm';
 
 export default function Application() {
