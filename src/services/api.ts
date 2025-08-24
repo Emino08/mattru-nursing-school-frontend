@@ -1,29 +1,13 @@
-// import axios from 'axios';
-//
-// const api = axios.create({
-//     baseURL: '/api',
-//     headers: {
-//         'Content-Type': 'application/json',
-//     },
-// });
-//
-// api.interceptors.request.use((config) => {
-//     const token = localStorage.getItem('token');
-//     if (token) {
-//         config.headers.Authorization = `Bearer ${token}`;
-//     }
-//     return config;
-// });
-//
-// export default api;
-
 // src/services/api.ts
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: '/api', // Replace with your actual backend URL
+    baseURL: 'http://localhost:8000',
+    // baseURL: '/api',
+    // baseURL:'https://backend.msn.edu.sl/',
     headers: {
         'Content-Type': 'application/json',
+        // 'Accept': 'application/json',
     },
 });
 

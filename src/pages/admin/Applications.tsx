@@ -162,9 +162,8 @@ export default function Applications() {
                                             <TableCell className="font-medium">{app.email}</TableCell>
                                             <TableCell>
                                                 {app.program_type === 'diploma' && 'Diploma in Nursing'}
-                                                {app.program_type === 'bachelors' && 'Bachelor of Science in Nursing'}
                                                 {app.program_type === 'certificate' && 'Certificate in Nursing Assistant'}
-                                                {!['diploma', 'bachelors', 'certificate'].includes(app.program_type) && app.program_type}
+                                                {!['diploma', 'certificate'].includes(app.program_type) && app.program_type}
                                             </TableCell>
                                             <TableCell>
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(app.application_status)}`}>

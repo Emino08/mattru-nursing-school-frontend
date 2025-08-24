@@ -9,14 +9,25 @@ import api from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 
 interface Application {
-    application_id: number;
+    id: number;
+    application_number: string | null;
+    applicant_id: number;
+    program_type: string | null;
     application_status: string;
+    form_data: string;
+    submission_date: string;
     created_at: string;
     updated_at: string;
-    program_type?: string;
-    personal_info?: Record<string, unknown>;
-    academic_info?: Record<string, unknown>;
-    documents?: Record<string, unknown>;
+    user_id: number;
+    status: string;
+}
+
+interface ParsedFormData {
+    personal_info: Record<string, any>;
+    academic_info: Record<string, any>;
+    documents: string[];
+    wassce_info: Record<string, any>;
+    other_info: Record<string, any>;
 }
 
 interface ApplicationDetailsModalProps {
@@ -25,12 +36,81 @@ interface ApplicationDetailsModalProps {
 }
 
 function ApplicationDetailsModal({ application, children }: ApplicationDetailsModalProps) {
+    const [parsedData, setParsedData] = useState<ParsedFormData | null>(null);
+
+    useEffect(() => {
+        try {
+            const formData = JSON.parse(application.form_data);
+
+            // Parse and categorize the form data
+            const personal_info: Record<string, any> = {};
+            const academic_info: Record<string, any> = {};
+            const documents: string[] = [];
+            const wassce_info: Record<string, any> = {};
+            const other_info: Record<string, any> = {};
+
+            Object.entries(formData).forEach(([key, value]) => {
+                if (key.includes('wassce')) {
+                    wassce_info[key] = value;
+                } else if (typeof value === 'string' && (value.includes('.jpeg') || value.includes('.pdf') || value.includes('.png'))) {
+                    documents.push(`${key}: ${value}`);
+                } else if (key.startsWith('question_')) {
+                    const questionNum = parseInt(key.replace('question_', ''));
+                    // Categorize based on question numbers (you might need to adjust these ranges)
+                    if (questionNum >= 4 && questionNum <= 22) {
+                        personal_info[key] = value;
+                    } else if (questionNum >= 23 && questionNum <= 35) {
+                        academic_info[key] = value;
+                    } else {
+                        other_info[key] = value;
+                    }
+                } else {
+                    other_info[key] = value;
+                }
+            });
+
+            setParsedData({
+                personal_info,
+                academic_info,
+                documents,
+                wassce_info,
+                other_info
+            });
+        } catch (error) {
+            console.error('Error parsing form data:', error);
+            setParsedData(null);
+        }
+    }, [application.form_data]);
+
+    const renderFormSection = (title: string, data: Record<string, any>) => {
+        if (!data || Object.keys(data).length === 0) return null;
+
+        return (
+            <>
+                <Separator />
+                <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-600">{title}</label>
+                    <div className="bg-gray-50 p-4 rounded-md space-y-2">
+                        {Object.entries(data).map(([key, value]) => (
+                            <div key={key} className="flex flex-col space-y-1">
+                                <span className="text-xs font-medium text-gray-500 uppercase">{key.replace(/question_|_/g, ' ')}</span>
+                                <span className="text-sm text-gray-700">
+                                    {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </>
+        );
+    };
+
     return (
         <Dialog>
             <DialogTrigger asChild>
                 {children}
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Application Details</DialogTitle>
                 </DialogHeader>
@@ -38,7 +118,9 @@ function ApplicationDetailsModal({ application, children }: ApplicationDetailsMo
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-600">Application ID</label>
-                            <p className="text-gray-900 font-medium">{application.application_id}</p>
+                            <p className="text-gray-900 font-medium">
+                                {application.application_number || `APP-${application.id}`}
+                            </p>
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-600">Status</label>
@@ -48,7 +130,7 @@ function ApplicationDetailsModal({ application, children }: ApplicationDetailsMo
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-600">Submitted Date</label>
-                            <p className="text-gray-900">{formatDate(application.created_at)}</p>
+                            <p className="text-gray-900">{formatDate(application.submission_date || application.created_at)}</p>
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-600">Last Updated</label>
@@ -66,45 +148,29 @@ function ApplicationDetailsModal({ application, children }: ApplicationDetailsMo
                         </>
                     )}
 
-                    {application.personal_info && (
+                    {parsedData && (
                         <>
-                            <Separator />
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-600">Personal Information</label>
-                                <div className="bg-gray-50 p-3 rounded-md">
-                                    <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                                        {JSON.stringify(application.personal_info, null, 2)}
-                                    </pre>
-                                </div>
-                            </div>
-                        </>
-                    )}
+                            {renderFormSection('Personal Information', parsedData.personal_info)}
+                            {renderFormSection('Academic Information', parsedData.academic_info)}
+                            {renderFormSection('WASSCE Information', parsedData.wassce_info)}
 
-                    {application.academic_info && (
-                        <>
-                            <Separator />
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-600">Academic Information</label>
-                                <div className="bg-gray-50 p-3 rounded-md">
-                                    <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                                        {JSON.stringify(application.academic_info, null, 2)}
-                                    </pre>
-                                </div>
-                            </div>
-                        </>
-                    )}
+                            {parsedData.documents.length > 0 && (
+                                <>
+                                    <Separator />
+                                    <div className="space-y-3">
+                                        <label className="text-sm font-medium text-gray-600">Uploaded Documents</label>
+                                        <div className="bg-gray-50 p-4 rounded-md">
+                                            <ul className="space-y-1">
+                                                {parsedData.documents.map((doc, index) => (
+                                                    <li key={index} className="text-sm text-gray-700">• {doc}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
 
-                    {application.documents && (
-                        <>
-                            <Separator />
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-600">Documents</label>
-                                <div className="bg-gray-50 p-3 rounded-md">
-                                    <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                                        {JSON.stringify(application.documents, null, 2)}
-                                    </pre>
-                                </div>
-                            </div>
+                            {renderFormSection('Other Information', parsedData.other_info)}
                         </>
                     )}
                 </div>
@@ -118,10 +184,12 @@ const getStatusColor = (status: string) => {
 
     switch (status.toLowerCase()) {
         case 'submitted': return 'bg-blue-100 text-blue-800';
+        case 'under_review': return 'bg-yellow-100 text-yellow-800';
         case 'interview_scheduled': return 'bg-purple-100 text-purple-800';
         case 'offer_issued': return 'bg-amber-100 text-amber-800';
-        case 'payment_verified': return 'bg-green-100 text-green-800';
-        case 'completed': return 'bg-emerald-100 text-emerald-800';
+        case 'rejected': return 'bg-red-100 text-red-800';
+        case 'completed': return 'bg-green-100 text-green-800';
+        case 'draft': return 'bg-gray-100 text-gray-800';
         default: return 'bg-gray-100 text-gray-800';
     }
 };
@@ -134,7 +202,13 @@ const formatStatus = (status: string) => {
 const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-        return new Date(dateString).toLocaleDateString();
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     } catch {
         return 'Invalid Date';
     }
@@ -160,14 +234,22 @@ export default function Status() {
                         data = [data];
                     }
 
-                    const validApplications = data.filter((app: Application) =>
+                    // Filter to only show submitted applications
+                    const submittedApplications = data.filter((app: Application) =>
                         app &&
                         typeof app === 'object' &&
-                        app.application_id !== undefined &&
-                        app.application_status !== undefined
+                        app.id !== undefined &&
+                        app.application_status === 'submitted'
                     );
 
-                    setApplications(validApplications);
+                    // Sort by submission date (newest first)
+                    submittedApplications.sort((a: Application, b: Application) => {
+                        const dateA = new Date(a.submission_date || a.created_at).getTime();
+                        const dateB = new Date(b.submission_date || b.created_at).getTime();
+                        return dateB - dateA;
+                    });
+
+                    setApplications(submittedApplications);
                 } catch (error) {
                     console.error('Error processing applications data:', error);
                     setApplications([]);
@@ -190,13 +272,15 @@ export default function Status() {
         }
 
         try {
-            const res = await api.post('/api/applicant/payment', {
+            const res = await api.post('/applicant/payment', {
                 application_id: applicationId,
-                amount: 100
+                amount: 500 // Adjust amount as needed
             });
 
             if (res.data && res.data.pin) {
-                toast.success(`Payment initiated, PIN: ${res.data.pin}`);
+                toast.success(`Payment initiated successfully. PIN: ${res.data.pin}`, {
+                    duration: 10000 // Show for 10 seconds
+                });
             } else {
                 toast.success('Payment initiated successfully');
             }
@@ -211,7 +295,7 @@ export default function Status() {
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold text-gray-800">Application Status</h2>
                 <div className="bg-blue-100 text-primary px-3 py-1 rounded-full text-sm font-medium">
-                    {applications.length} Application{applications.length !== 1 ? 's' : ''}
+                    {applications.length} Submitted Application{applications.length !== 1 ? 's' : ''}
                 </div>
             </div>
 
@@ -222,12 +306,13 @@ export default function Status() {
             ) : (
                 <Card className="border border-gray-200 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-primary-light/10 to-secondary-light/10 pb-4">
-                        <CardTitle className="text-lg text-gray-800">Your Applications</CardTitle>
+                        <CardTitle className="text-lg text-gray-800">Your Submitted Applications</CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
                             <TableHeader className="bg-gray-50">
                                 <TableRow>
+                                    <TableHead className="font-semibold">Application ID</TableHead>
                                     <TableHead className="font-semibold">Program</TableHead>
                                     <TableHead className="font-semibold">Status</TableHead>
                                     <TableHead className="font-semibold">Submission Date</TableHead>
@@ -237,50 +322,79 @@ export default function Status() {
                             <TableBody>
                                 {applications.length > 0 ? (
                                     applications.map((app) => (
-                                        <TableRow key={app.application_id || Math.random()} className="hover:bg-gray-50">
+                                        <TableRow key={app.id} className="hover:bg-gray-50">
                                             <TableCell className="font-medium">
-                                                {app.program_type || 'Program Type Not Available'}
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-blue-600">
+                                                        {app.application_number || `APP-${app.id}`}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500">ID: {app.id}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {app.program_type || 'Nursing Program'}
                                             </TableCell>
                                             <TableCell>
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(app.application_status)}`}>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(app.application_status)}`}>
                                                     {formatStatus(app.application_status)}
                                                 </span>
                                             </TableCell>
-                                            <TableCell>{formatDate(app.created_at)}</TableCell>
                                             <TableCell>
-                                                {app.application_status === 'offer_issued' && (
-                                                    <Button
-                                                        onClick={() => initiatePayment(app.application_id)}
-                                                        className="text-white transition-all h-9 mr-2"
-                                                        style={{
-                                                            backgroundColor: '#2563EB',
-                                                            boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
-                                                        }}
-                                                        onMouseOver={(e) => {
-                                                            e.currentTarget.style.backgroundColor = '#1D4ED8';
-                                                        }}
-                                                        onMouseOut={(e) => {
-                                                            e.currentTarget.style.backgroundColor = '#2563EB';
-                                                        }}
-                                                    >
-                                                        Initiate Payment
-                                                    </Button>
-                                                )}
-                                                <ApplicationDetailsModal application={app}>
-                                                    <Button
-                                                        variant="outline"
-                                                        className="h-9 text-primary border-primary hover:bg-primary-light/10"
-                                                    >
-                                                        View Details
-                                                    </Button>
-                                                </ApplicationDetailsModal>
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm">{formatDate(app.submission_date || app.created_at)}</span>
+                                                    {app.updated_at !== app.created_at && (
+                                                        <span className="text-xs text-gray-500">
+                                                            Updated: {formatDate(app.updated_at)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex gap-2">
+                                                    {app.application_status === 'offer_issued' && (
+                                                        <Button
+                                                            onClick={() => initiatePayment(app.id)}
+                                                            className="text-white transition-all h-9"
+                                                            style={{
+                                                                backgroundColor: '#2563EB',
+                                                                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                                                            }}
+                                                            onMouseOver={(e) => {
+                                                                e.currentTarget.style.backgroundColor = '#1D4ED8';
+                                                            }}
+                                                            onMouseOut={(e) => {
+                                                                e.currentTarget.style.backgroundColor = '#2563EB';
+                                                            }}
+                                                        >
+                                                            Initiate Payment
+                                                        </Button>
+                                                    )}
+                                                    <ApplicationDetailsModal application={app}>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="h-9 text-primary border-primary hover:bg-primary-light/10"
+                                                        >
+                                                            View Details
+                                                        </Button>
+                                                    </ApplicationDetailsModal>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="text-center py-8 text-gray-500">
-                                            No applications found
+                                        <TableCell colSpan={5} className="text-center py-12">
+                                            <div className="flex flex-col items-center justify-center space-y-3">
+                                                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                                                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                </div>
+                                                <div className="text-center">
+                                                    <h3 className="text-lg font-medium text-gray-900">No submitted applications</h3>
+                                                    <p className="text-gray-500">You haven't submitted any applications yet.</p>
+                                                </div>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 )}

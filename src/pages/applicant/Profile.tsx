@@ -25,7 +25,23 @@ interface Profile {
 }
 
 export default function Profile() {
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [profile, setProfile] = useState<Profile>({
+        first_name: '',
+        last_name: '',
+        phone: '',
+        date_of_birth: '',
+        nationality: '',
+        address: {
+            country: '',
+            province: '',
+            district: '',
+            town: ''
+        },
+        emergency_contact: {
+            name: '',
+            phone: ''
+        }
+    });
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -33,18 +49,16 @@ export default function Profile() {
         setIsLoading(true);
         api.get('/applicant/profile')
             .then(res => {
-                setProfile(res.data);
+                setProfile(prevProfile => ({ ...prevProfile, ...res.data }));
                 setIsLoading(false);
             })
             .catch(() => {
-                toast({ title: 'Error', description: 'Failed to load profile', variant: 'destructive' });
+                toast.error('Failed to load profile');
                 setIsLoading(false);
             });
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!profile) return;
-
         const { name, value } = e.target;
 
         if (name.includes('.')) {
@@ -69,10 +83,10 @@ export default function Profile() {
 
         try {
             await api.put('/applicant/profile', profile);
-            toast({ title: 'Success', description: 'Profile updated successfully' });
+            toast.success('Profile updated successfully');
             setIsEditing(false);
         } catch (error) {
-            toast({ title: 'Error', description: 'Failed to update profile', variant: 'destructive' });
+            toast.error('Failed to update profile');
         }
     };
 
@@ -106,182 +120,180 @@ export default function Profile() {
                 </Button>
             </div>
 
-            {profile && (
-                <form onSubmit={handleSubmit}>
-                    <Card className="border border-gray-200 shadow-sm">
-                        <CardHeader className="bg-gradient-to-r from-primary-light/10 to-secondary-light/10 pb-4">
-                            <CardTitle className="text-lg text-gray-800">Personal Information</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-5">
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <Label htmlFor="first_name" className="text-gray-700 font-medium mb-1 block">First Name</Label>
-                                    <Input
-                                        id="first_name"
-                                        name="first_name"
-                                        value={profile.first_name}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="last_name" className="text-gray-700 font-medium mb-1 block">Last Name</Label>
-                                    <Input
-                                        id="last_name"
-                                        name="last_name"
-                                        value={profile.last_name}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="phone" className="text-gray-700 font-medium mb-1 block">Phone</Label>
-                                    <Input
-                                        id="phone"
-                                        name="phone"
-                                        value={profile.phone}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="date_of_birth" className="text-gray-700 font-medium mb-1 block">Date of Birth</Label>
-                                    <Input
-                                        id="date_of_birth"
-                                        name="date_of_birth"
-                                        type="date"
-                                        value={profile.date_of_birth}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="nationality" className="text-gray-700 font-medium mb-1 block">Nationality</Label>
-                                    <Input
-                                        id="nationality"
-                                        name="nationality"
-                                        value={profile.nationality}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
+            <form onSubmit={handleSubmit}>
+                <Card className="border border-gray-200 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-primary-light/10 to-secondary-light/10 pb-4">
+                        <CardTitle className="text-lg text-gray-800">Personal Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="first_name" className="text-gray-700 font-medium mb-1 block">First Name</Label>
+                                <Input
+                                    id="first_name"
+                                    name="first_name"
+                                    value={profile.first_name}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-200 shadow-sm mt-6">
-                        <CardHeader className="bg-gradient-to-r from-primary-light/10 to-secondary-light/10 pb-4">
-                            <CardTitle className="text-lg text-gray-800">Address Information</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-5">
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <Label htmlFor="address.country" className="text-gray-700 font-medium mb-1 block">Country</Label>
-                                    <Input
-                                        id="address.country"
-                                        name="address.country"
-                                        value={profile.address.country}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="address.province" className="text-gray-700 font-medium mb-1 block">Province</Label>
-                                    <Input
-                                        id="address.province"
-                                        name="address.province"
-                                        value={profile.address.province}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="address.district" className="text-gray-700 font-medium mb-1 block">District</Label>
-                                    <Input
-                                        id="address.district"
-                                        name="address.district"
-                                        value={profile.address.district}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="address.town" className="text-gray-700 font-medium mb-1 block">Town</Label>
-                                    <Input
-                                        id="address.town"
-                                        name="address.town"
-                                        value={profile.address.town}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
+                            <div>
+                                <Label htmlFor="last_name" className="text-gray-700 font-medium mb-1 block">Last Name</Label>
+                                <Input
+                                    id="last_name"
+                                    name="last_name"
+                                    value={profile.last_name}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-200 shadow-sm mt-6">
-                        <CardHeader className="bg-gradient-to-r from-primary-light/10 to-secondary-light/10 pb-4">
-                            <CardTitle className="text-lg text-gray-800">Emergency Contact</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-5">
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <Label htmlFor="emergency_contact.name" className="text-gray-700 font-medium mb-1 block">Name</Label>
-                                    <Input
-                                        id="emergency_contact.name"
-                                        name="emergency_contact.name"
-                                        value={profile.emergency_contact.name}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="emergency_contact.phone" className="text-gray-700 font-medium mb-1 block">Phone</Label>
-                                    <Input
-                                        id="emergency_contact.phone"
-                                        name="emergency_contact.phone"
-                                        value={profile.emergency_contact.phone}
-                                        onChange={handleChange}
-                                        disabled={!isEditing}
-                                        className="h-10 border-gray-200"
-                                    />
-                                </div>
+                            <div>
+                                <Label htmlFor="phone" className="text-gray-700 font-medium mb-1 block">Phone</Label>
+                                <Input
+                                    id="phone"
+                                    name="phone"
+                                    value={profile.phone}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    {isEditing && (
-                        <div className="flex justify-end mt-6">
-                            <Button
-                                type="submit"
-                                className="text-white transition-all h-10 px-6"
-                                style={{
-                                    backgroundColor: '#10B981',
-                                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
-                                }}
-                                onMouseOver={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#059669';
-                                }}
-                                onMouseOut={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#10B981';
-                                }}
-                            >
-                                Save Changes
-                            </Button>
+                            <div>
+                                <Label htmlFor="date_of_birth" className="text-gray-700 font-medium mb-1 block">Date of Birth</Label>
+                                <Input
+                                    id="date_of_birth"
+                                    name="date_of_birth"
+                                    type="date"
+                                    value={profile.date_of_birth}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="nationality" className="text-gray-700 font-medium mb-1 block">Nationality</Label>
+                                <Input
+                                    id="nationality"
+                                    name="nationality"
+                                    value={profile.nationality}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
+                            </div>
                         </div>
-                    )}
-                </form>
-            )}
+                    </CardContent>
+                </Card>
+
+                <Card className="border border-gray-200 shadow-sm mt-6">
+                    <CardHeader className="bg-gradient-to-r from-primary-light/10 to-secondary-light/10 pb-4">
+                        <CardTitle className="text-lg text-gray-800">Address Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="address.country" className="text-gray-700 font-medium mb-1 block">Country</Label>
+                                <Input
+                                    id="address.country"
+                                    name="address.country"
+                                    value={profile.address.country}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="address.province" className="text-gray-700 font-medium mb-1 block">Province</Label>
+                                <Input
+                                    id="address.province"
+                                    name="address.province"
+                                    value={profile.address.province}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="address.district" className="text-gray-700 font-medium mb-1 block">District</Label>
+                                <Input
+                                    id="address.district"
+                                    name="address.district"
+                                    value={profile.address.district}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="address.town" className="text-gray-700 font-medium mb-1 block">Town</Label>
+                                <Input
+                                    id="address.town"
+                                    name="address.town"
+                                    value={profile.address.town}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border border-gray-200 shadow-sm mt-6">
+                    <CardHeader className="bg-gradient-to-r from-primary-light/10 to-secondary-light/10 pb-4">
+                        <CardTitle className="text-lg text-gray-800">Emergency Contact</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="emergency_contact.name" className="text-gray-700 font-medium mb-1 block">Name</Label>
+                                <Input
+                                    id="emergency_contact.name"
+                                    name="emergency_contact.name"
+                                    value={profile.emergency_contact.name}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="emergency_contact.phone" className="text-gray-700 font-medium mb-1 block">Phone</Label>
+                                <Input
+                                    id="emergency_contact.phone"
+                                    name="emergency_contact.phone"
+                                    value={profile.emergency_contact.phone}
+                                    onChange={handleChange}
+                                    disabled={!isEditing}
+                                    className="h-10 border-gray-200"
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {isEditing && (
+                    <div className="flex justify-end mt-6">
+                        <Button
+                            type="submit"
+                            className="text-white transition-all h-10 px-6"
+                            style={{
+                                backgroundColor: '#10B981',
+                                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.backgroundColor = '#059669';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.backgroundColor = '#10B981';
+                            }}
+                        >
+                            Save Changes
+                        </Button>
+                    </div>
+                )}
+            </form>
         </div>
     );
 }

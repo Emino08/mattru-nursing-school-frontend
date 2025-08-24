@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,26 +10,32 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import api from '@/services/api';
-import { Upload, ChevronLeft, ChevronRight, Check, FileIcon, X, Save, Clock, Printer, Eye, Edit, Plus, Trash2 } from 'lucide-react';
+import {
+    Upload,
+    ChevronLeft,
+    ChevronRight,
+    Check,
+    FileIcon,
+    X,
+    Save,
+    Clock,
+    Printer,
+    Eye,
+    Edit,
+    Plus,
+    Trash2
+} from 'lucide-react';
 
-// WASSCE and A-Level subjects and grades
 const WASSCE_SUBJECTS = [
-    'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
-    'History', 'Geography', 'Economics', 'Literature in English', 'French',
-    'Government', 'Religious Studies', 'Agricultural Science', 'Technical Drawing',
-    'Visual Arts', 'Music', 'Computer Studies', 'Physical Education'
+    'Mathematics','English Language','Physics','Chemistry','Biology','History','Geography','Economics','Literature in English','French',
+    'Government','Religious Studies','Agricultural Science','Technical Drawing','Visual Arts','Music','Computer Studies','Physical Education'
 ];
-
 const A_LEVEL_SUBJECTS = [
-    'Mathematics', 'Further Mathematics', 'Physics', 'Chemistry', 'Biology',
-    'History', 'Geography', 'Economics', 'Literature in English', 'French',
-    'Government', 'Psychology', 'Sociology', 'Art', 'Music'
+    'Mathematics','Further Mathematics','Physics','Chemistry','Biology','History','Geography','Economics','Literature in English','French',
+    'Government','Psychology','Sociology','Art','Music'
 ];
-
-const WASSCE_GRADES = ['A1', 'A2', 'B2', 'B3', 'C4', 'C5', 'C6', 'D7', 'E8', 'F9'];
-const A_LEVEL_GRADES = ['A', 'B', 'C', 'D', 'E'];
-
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WASSCE_GRADES = ['A1','A2','B2','B3','C4','C5','C6','D7','E8','F9'];
+const A_LEVEL_GRADES = ['A','B','C','D','E'];
 
 interface Question {
     id: number;
@@ -40,14 +46,16 @@ interface Question {
     question_text: string;
     question_type: string;
     options?: string[] | string;
-    validation_rules?: Record<string, any>;
+    validation_rules?: Record<string, unknown>;
     conditional_logic?: { question_id: number; value: string; show_question_ids?: number[] } | null;
     is_required: boolean;
     sort_order: number;
-    table_columns?: Array<{ id: number; name: string; type: string; is_required: boolean; options?: string[] }>;
+    table_columns?: Array<{ id: number; name: string; type: string; is_required: boolean; options?: string[] | string }>;
 }
 
 interface SubmittedApplication {
+    id: number;
+    application_number?: string;
     submitted_at: string;
     categories: {
         [key: string]: Array<{
@@ -56,13 +64,11 @@ interface SubmittedApplication {
             answer: string;
             file_path?: string;
             question_type: string;
-        }>;
+        }>
     };
 }
 
-interface FormData {
-    [key: string]: any;
-}
+type FormState = Record<string, any>;
 
 interface Category {
     name: string;
@@ -70,21 +76,25 @@ interface Category {
     questions: Question[];
 }
 
-interface TableRow {
-    [key: string]: string;
-}
+interface TableRowData { [key: string]: string }
 
-interface QualificationResult {
-    subject: string;
-    grade: string;
+interface QualificationResult { subject: string; grade: string }
+
+interface FileMeta {
+    filename: string;
+    original_name: string;
+    file_path?: string;
+    size?: number;
+    type?: string;
+    uploaded_at?: string;
 }
 
 export default function MultiStepperForm() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [currentStep, setCurrentStep] = useState(0);
-    const [formData, setFormData] = useState<FormData>({});
-    const [files, setFiles] = useState<{ [key: string]: File }>({});
-    const [filesMetadata, setFilesMetadata] = useState<{ [key: string]: any }>({});
+    const [formData, setFormData] = useState<FormState>({});
+    const [files, setFiles] = useState<Record<string, File>>({});
+    const [filesMetadata, setFilesMetadata] = useState<Record<string, FileMeta>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -94,300 +104,577 @@ export default function MultiStepperForm() {
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
     const [submittedApplication, setSubmittedApplication] = useState<SubmittedApplication | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
-    const [previewFile, setPreviewFile] = useState<{ url: string; type: string } | null>(null);
+    const [previewFile, setPreviewFile] = useState<{ url: string; type: string; name?: string }>({ url: '', type: '' });
+    const [applicationNumber, setApplicationNumber] = useState<string | null>(null);
     const printRef = useRef<HTMLDivElement>(null);
 
-    // State for qualification handling
     const [wassceSittings, setWassceSittings] = useState<number>(1);
     const [alevelSittings, setAlevelSittings] = useState<number>(1);
     const [wassceResults, setWassceResults] = useState<QualificationResult[][]>([[]]);
     const [alevelResults, setAlevelResults] = useState<QualificationResult[][]>([[]]);
 
-    // Auto-save every 30 seconds
+    const safeJsonParse = <T,>(text: string, fallback: T): T => {
+        try { return JSON.parse(text) as T } catch { return fallback }
+    };
+    const extractFilename = (path: string): string => {
+        try { return path?.split('/').pop() || path } catch { return path }
+    };
+    const isImage = (name: string) => /\.(png|jpe?g|gif|webp|svg)$/i.test(name);
+    const isPdf = (name: string) => /\.pdf$/i.test(name);
+    const resolveFileUrl = (meta?: FileMeta): string => {
+        if (!meta) return '';
+        if (meta.file_path?.startsWith('http')) return meta.file_path;
+        if (meta.file_path) return meta.file_path;
+        return `/uploads/${meta.filename}`;
+    };
+
+    const saveProgress = useCallback(
+        async (showNotification = true) => {
+            if (isSaving) return;
+            setIsSaving(true);
+            try {
+                const fd = new FormData();
+                fd.append('formData', JSON.stringify(formData));
+                fd.append('currentStep', currentStep.toString());
+                fd.append('completedSteps', JSON.stringify(completedSteps));
+
+                Object.keys(files).forEach(k => {
+                    const f = files[k];
+                    if (f && !filesMetadata[k]?.file_path) {
+                        fd.append(k, f);
+                    }
+                });
+
+                const response = await api.post('/applicant/application/save-progress', fd, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+
+                if (response.data.files_metadata) {
+                    setFilesMetadata(prev => ({
+                        ...prev,
+                        ...response.data.files_metadata
+                    }));
+                }
+
+                const now = new Date().toISOString();
+                setLastSaved(now);
+                if (showNotification) toast.success('Progress saved');
+            } catch (error) {
+                console.error('Save progress error:', error);
+                if (showNotification) toast.error('Save failed');
+            } finally {
+                setIsSaving(false);
+            }
+        },
+        [formData, files, filesMetadata, currentStep, completedSteps, isSaving]
+    );
+
     useEffect(() => {
         if (!autoSaveEnabled || isEditMode) return;
-
         const interval = setInterval(() => {
             if (Object.keys(formData).length > 0 || Object.keys(files).length > 0) {
                 saveProgress(false);
             }
         }, 30000);
-
         return () => clearInterval(interval);
-    }, [formData, files, currentStep, completedSteps, autoSaveEnabled, isEditMode]);
+    }, [formData, files, currentStep, completedSteps, autoSaveEnabled, isEditMode, saveProgress]);
+
+    useEffect(() => {
+        if (isEditMode) {
+            setCurrentStep(0);
+            setCompletedSteps([]);
+        }
+    }, [isEditMode]);
 
     useEffect(() => {
         initializeForm();
-    }, []);
+    }, [isEditMode]);
 
     useEffect(() => {
         validateCurrentStep();
-    }, [formData, currentStep, categories, files]);
+    }, [formData, currentStep, categories, files, filesMetadata, wassceResults, alevelResults, wassceSittings, alevelSittings]);
+
+    useEffect(() => {
+        if (Object.keys(formData).length > 0 && !isLoading) {
+            const wassceKeys = Object.keys(formData).filter(k => k.startsWith('wassce_results_sitting_'));
+            if (wassceKeys.length > 0) {
+                const max = Math.max(...wassceKeys.map(k => parseInt(k.split('_')[3], 10)));
+                setWassceSittings(max);
+                const restored = Array.from({ length: max }, (_, idx) => {
+                    const data = formData[`wassce_results_sitting_${idx + 1}`];
+                    if (Array.isArray(data)) return data as QualificationResult[];
+                    if (typeof data === 'string') return safeJsonParse<QualificationResult[]>(data, []);
+                    return [];
+                });
+                setWassceResults(restored);
+            }
+            const alevelKeys = Object.keys(formData).filter(k => k.startsWith('alevel_results_sitting_'));
+            if (alevelKeys.length > 0) {
+                const max = Math.max(...alevelKeys.map(k => parseInt(k.split('_')[3], 10)));
+                setAlevelSittings(max);
+                const restored = Array.from({ length: max }, (_, idx) => {
+                    const data = formData[`alevel_results_sitting_${idx + 1}`];
+                    if (Array.isArray(data)) return data as QualificationResult[];
+                    if (typeof data === 'string') return safeJsonParse<QualificationResult[]>(data, []);
+                    return [];
+                });
+                setAlevelResults(restored);
+            }
+        }
+    }, [formData, isLoading]);
+
+    // const initializeForm = async () => {
+    //     try {
+    //         setIsLoading(true);
+    //         const [questionsResponse, profileResponse, submittedResponse, draftResponse] = await Promise.all([
+    //             api.get('/applicant/questions'),
+    //             api.get('/applicant/profile'),
+    //             api.get('/applicant/application/submitted'),
+    //             api.get('/applicant/application/load-progress').catch(() => ({ data: null }))
+    //         ]);
+    //
+    //         const rawQuestions: Question[] = (questionsResponse.data || []) as Question[];
+    //         const questions: Question[] = rawQuestions.map(q => {
+    //             let opts = q.options;
+    //             if (typeof opts === 'string') {
+    //                 const parsed = safeJsonParse<string[]>(opts, []);
+    //                 opts = parsed;
+    //             }
+    //             let logic = q.conditional_logic;
+    //             if (typeof logic === 'string') logic = safeJsonParse(logic, null);
+    //             let tableCols = q.table_columns;
+    //             if (typeof tableCols === 'string') tableCols = safeJsonParse(tableCols, []);
+    //             return { ...q, options: opts, conditional_logic: logic, table_columns: tableCols };
+    //         });
+    //
+    //         const qualificationQuestion = questions.find(q =>
+    //             q.question_text.toLowerCase().includes('qualification type') ||
+    //             q.question_text.toLowerCase().includes('certificate type')
+    //         );
+    //         if (qualificationQuestion) {
+    //             qualificationQuestion.options = ['WASSCE','A-Level','Degree','Diploma','Certificate'];
+    //         }
+    //
+    //         const grouped = questions.reduce<Record<string, { questions: Question[]; order: number }>>((acc, q) => {
+    //             if (!acc[q.category]) acc[q.category] = { questions: [], order: q.category_order };
+    //             acc[q.category].questions.push(q);
+    //             return acc;
+    //         }, {});
+    //         const categoriesArray: Category[] = Object.keys(grouped)
+    //             .map(name => ({
+    //                 name,
+    //                 order: grouped[name].order,
+    //                 questions: grouped[name].questions.sort((a, b) => a.sort_order - b.sort_order)
+    //             }))
+    //             .sort((a, b) => a.order - b.order);
+    //         setCategories(categoriesArray);
+    //
+    //         let submittedApp: SubmittedApplication | null = null;
+    //         if (submittedResponse.data?.application && !Array.isArray(submittedResponse.data.application)) {
+    //             submittedApp = submittedResponse.data.application as SubmittedApplication;
+    //             setApplicationNumber(submittedApp.application_number || null);
+    //         }
+    //
+    //         if (submittedApp && !isEditMode) {
+    //             setSubmittedApplication(submittedApp);
+    //             setIsLoading(false);
+    //             return;
+    //         }
+    //
+    //         const profileData = profileResponse.data || {};
+    //
+    //         let initialFormData: FormState = {};
+    //         let initialFilesMetadata: Record<string, FileMeta> = {};
+    //         let restoredCurrentStep = 0;
+    //         let restoredCompletedSteps: number[] = [];
+    //         let restoredLastSaved: string | null = null;
+    //
+    //         if (isEditMode && submittedApp) {
+    //             setApplicationNumber(submittedApp.application_number || null);
+    //             Object.values(submittedApp.categories).forEach(answerArr => {
+    //                 answerArr.forEach(ans => {
+    //                     const key = `question_${ans.question_id}`;
+    //                     if (ans.question_type === 'file') {
+    //                         if (ans.file_path) {
+    //                             const fname = extractFilename(ans.file_path);
+    //                             initialFormData[key] = fname;
+    //                             initialFilesMetadata[key] = {
+    //                                 filename: fname,
+    //                                 original_name: fname,
+    //                                 file_path: ans.file_path
+    //                             };
+    //                         }
+    //                     } else if (ans.question_type === 'multiple_select') {
+    //                         let parsed: any = [];
+    //                         if (ans.answer?.trim().startsWith('[')) {
+    //                             parsed = safeJsonParse(ans.answer, []);
+    //                         } else if (ans.answer?.includes(',')) {
+    //                             parsed = ans.answer.split(',').map(s => s.trim()).filter(Boolean);
+    //                         } else if (ans.answer) {
+    //                             parsed = [ans.answer];
+    //                         }
+    //                         initialFormData[key] = parsed;
+    //                     } else if (ans.question_type === 'table') {
+    //                         let parsed = safeJsonParse<TableRowData[]>(ans.answer, []);
+    //                         initialFormData[key] = parsed;
+    //                     } else {
+    //                         initialFormData[key] = ans.answer;
+    //                     }
+    //                 });
+    //             });
+    //         } else if (draftResponse.data?.draft) {
+    //             const draft = draftResponse.data.draft;
+    //             if (draft.formData) initialFormData = safeJsonParse<FormState>(draft.formData, {});
+    //             if (draft.filesMetadata) initialFilesMetadata = safeJsonParse<Record<string, FileMeta>>(draft.filesMetadata, {});
+    //             if (draft.currentStep !== undefined) restoredCurrentStep = draft.currentStep;
+    //             if (draft.completedSteps) restoredCompletedSteps = safeJsonParse<number[]>(draft.completedSteps, []);
+    //             if (draft.updated_at) restoredLastSaved = draft.updated_at;
+    //         }
+    //
+    //         const profileMappings: Record<string, string[]> = {
+    //             first_name: ['first name'],
+    //             last_name: ['last name'],
+    //             middle_name: ['middle name'],
+    //             email: ['email'],
+    //             phone: ['phone'],
+    //             date_of_birth: ['date of birth','dob'],
+    //             gender: ['gender','sex'],
+    //             country: ['country','nationality'],
+    //             address: ['address','residential address']
+    //         };
+    //         categoriesArray.forEach(cat => {
+    //             cat.questions.forEach(q => {
+    //                 const lower = q.question_text.toLowerCase();
+    //                 Object.entries(profileMappings).forEach(([field, keys]) => {
+    //                     if (keys.some(k => lower.includes(k))) {
+    //                         if (!initialFormData[`question_${q.id}`] && profileData[field]) {
+    //                             initialFormData[`question_${q.id}`] = profileData[field];
+    //                         }
+    //                     }
+    //                 });
+    //             });
+    //         });
+    //
+    //         setFormData(initialFormData);
+    //         setFilesMetadata(initialFilesMetadata);
+    //
+    //         if (!isEditMode && restoredLastSaved) {
+    //             setCurrentStep(restoredCurrentStep);
+    //             setCompletedSteps(restoredCompletedSteps);
+    //             setLastSaved(restoredLastSaved);
+    //             toast.success('Draft restored');
+    //         } else if (isEditMode) {
+    //             toast.success('Application loaded for editing');
+    //         } else {
+    //             toast.success('Form initialized');
+    //         }
+    //
+    //     } catch (e) {
+    //         console.error('Initialization error', e);
+    //         toast.error('Failed to load form');
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
 
     const initializeForm = async () => {
         try {
-            // Check if user has already submitted an application
-            const submittedResponse = await api.get('/applicant/application/submitted');
-            const submittedApp = submittedResponse.data.application;
-
-            if (submittedApp && submittedApp !== null && !Array.isArray(submittedApp)) {
-                setSubmittedApplication(submittedApp);
-                setIsLoading(false);
-                return;
-            }
-
-            // Load questions, progress, and profile in parallel
-            const [questionsResponse, progressResponse, profileResponse] = await Promise.all([
+            setIsLoading(true);
+            const [questionsResponse, profileResponse, submittedResponse, draftResponse] = await Promise.all([
                 api.get('/applicant/questions'),
-                api.get('/applicant/application/load-progress'),
-                api.get('/applicant/profile')
+                api.get('/applicant/profile'),
+                api.get('/applicant/application/submitted'),
+                api.get('/applicant/application/load-progress').catch(() => ({ data: null }))
             ]);
 
-            // Process questions and parse options
-            const questions = questionsResponse.data.map((question: Question) => ({
-                ...question,
-                options: question.options
-                    ? typeof question.options === 'string'
-                        ? JSON.parse(question.options)
-                        : question.options
-                    : [],
-                conditional_logic: question.conditional_logic
-                    ? typeof question.conditional_logic === 'string'
-                        ? JSON.parse(question.conditional_logic)
-                        : question.conditional_logic
-                    : null,
-                table_columns: question.table_columns
-                    ? question.table_columns.map(col => ({
-                        ...col,
-                        options: col.options ? (typeof col.options === 'string' ? JSON.parse(col.options) : col.options) : []
-                    }))
-                    : []
-            }));
+            const rawQuestions: Question[] = (questionsResponse.data || []) as Question[];
+            const questions: Question[] = rawQuestions.map(q => {
+                let opts = q.options;
+                if (typeof opts === 'string') {
+                    const parsed = safeJsonParse<string[]>(opts, []);
+                    opts = parsed;
+                }
+                let logic = q.conditional_logic;
+                if (typeof logic === 'string') logic = safeJsonParse(logic, null);
+                let tableCols = q.table_columns;
+                if (typeof tableCols === 'string') tableCols = safeJsonParse(tableCols, []);
+                return { ...q, options: opts, conditional_logic: logic, table_columns: tableCols };
+            });
 
-            // Add new qualification types to the qualification question
             const qualificationQuestion = questions.find(q =>
                 q.question_text.toLowerCase().includes('qualification type') ||
                 q.question_text.toLowerCase().includes('certificate type')
             );
             if (qualificationQuestion) {
-                qualificationQuestion.options = ['WASSCE', 'A-Level', 'Degree', 'Diploma', 'Certificate'];
+                qualificationQuestion.options = ['WASSCE','A-Level','Degree','Diploma','Certificate'];
             }
 
-            const grouped = questions.reduce((acc: { [key: string]: { questions: Question[], order: number } }, question: Question) => {
-                const categoryName = question.category;
-                if (!acc[categoryName]) {
-                    acc[categoryName] = {
-                        questions: [],
-                        order: question.category_order
-                    };
-                }
-                acc[categoryName].questions.push(question);
+            const grouped = questions.reduce<Record<string, { questions: Question[]; order: number }>>((acc, q) => {
+                if (!acc[q.category]) acc[q.category] = { questions: [], order: q.category_order };
+                acc[q.category].questions.push(q);
                 return acc;
             }, {});
-
-            const categoriesArray = Object.keys(grouped)
-                .map(categoryName => ({
-                    name: categoryName,
-                    order: grouped[categoryName].order,
-                    questions: grouped[categoryName].questions.sort((a, b) => a.sort_order - b.sort_order)
+            const categoriesArray: Category[] = Object.keys(grouped)
+                .map(name => ({
+                    name,
+                    order: grouped[name].order,
+                    questions: grouped[name].questions.sort((a, b) => a.sort_order - b.sort_order)
                 }))
                 .sort((a, b) => a.order - b.order);
-
             setCategories(categoriesArray);
 
-            // Load saved progress
-            const progress = progressResponse.data;
-            let initialFormData = progress.formData && Object.keys(progress.formData).length > 0
-                ? progress.formData
-                : {};
+            let submittedApp: SubmittedApplication | null = null;
+            if (submittedResponse.data?.application && !Array.isArray(submittedResponse.data.application)) {
+                submittedApp = submittedResponse.data.application as SubmittedApplication;
+                setApplicationNumber(submittedApp.application_number || null);
+            }
 
-            // Profile data from backend
-            const profileData = profileResponse.data;
+            if (submittedApp && !isEditMode) {
+                setSubmittedApplication(submittedApp);
+                setIsLoading(false);
+                return;
+            }
 
-            // Map profile data to corresponding questions
-            categoriesArray.forEach(category => {
-                if (category.name === 'Personal Information') {
-                    category.questions.forEach(question => {
-                        const fieldId = `question_${question.id}`;
-                        if (question.id === 4 && profileData.first_name) { // First Name
-                            initialFormData[fieldId] = profileData.first_name;
-                        } else if (question.id === 6 && profileData.last_name) { // Last Name
-                            initialFormData[fieldId] = profileData.last_name;
-                        } else if (question.id === 7 && profileData.date_of_birth) { // Date of Birth
-                            initialFormData[fieldId] = profileData.date_of_birth;
-                        } else if (question.id === 9 && profileData.nationality) { // Nationality
-                            initialFormData[fieldId] = profileData.nationality;
-                        } else if (question.id === 14 && profileData.address?.country) { // Country
-                            initialFormData[fieldId] = profileData.address.country;
-                        } else if (question.id === 15 && profileData.address?.province) { // Region/State
-                            initialFormData[fieldId] = profileData.address.province;
-                        } else if (question.id === 16 && profileData.address?.town) { // City
-                            initialFormData[fieldId] = profileData.address.town;
-                        } else if (question.id === 19 && profileData.phone) { // Phone Number
-                            initialFormData[fieldId] = profileData.phone;
-                        } else if (question.id === 20 && profileData.emergency_contact?.name) { // Emergency Contact Name
-                            initialFormData[fieldId] = profileData.emergency_contact.name;
-                        } else if (question.id === 22 && profileData.emergency_contact?.phone) { // Emergency Contact Phone
-                            initialFormData[fieldId] = profileData.emergency_contact.phone;
+            const profileData = profileResponse.data || {};
+
+            let initialFormData: FormState = {};
+            let initialFilesMetadata: Record<string, FileMeta> = {};
+            let restoredCurrentStep = 0;
+            let restoredCompletedSteps: number[] = [];
+            let restoredLastSaved: string | null = null;
+
+            // Handle Edit Mode - Load from submitted application
+            if (isEditMode && submittedApp) {
+                setApplicationNumber(submittedApp.application_number || null);
+                Object.values(submittedApp.categories).forEach(answerArr => {
+                    answerArr.forEach(ans => {
+                        const key = `question_${ans.question_id}`;
+                        if (ans.question_type === 'file') {
+                            if (ans.file_path) {
+                                const fname = extractFilename(ans.file_path);
+                                initialFormData[key] = fname;
+                                initialFilesMetadata[key] = {
+                                    filename: fname,
+                                    original_name: fname,
+                                    file_path: ans.file_path
+                                };
+                            }
+                        } else if (ans.question_type === 'multiple_select') {
+                            let parsed: any = [];
+                            if (ans.answer?.trim().startsWith('[')) {
+                                parsed = safeJsonParse(ans.answer, []);
+                            } else if (ans.answer?.includes(',')) {
+                                parsed = ans.answer.split(',').map(s => s.trim()).filter(Boolean);
+                            } else if (ans.answer) {
+                                parsed = [ans.answer];
+                            }
+                            initialFormData[key] = parsed;
+                        } else if (ans.question_type === 'table') {
+                            let parsed = safeJsonParse<TableRowData[]>(ans.answer, []);
+                            initialFormData[key] = parsed;
+                        } else {
+                            initialFormData[key] = ans.answer;
+                        }
+                    });
+                });
+            }
+            // Handle Draft Mode - Load from saved progress
+            else if (draftResponse.data?.draft) {
+                const draft = draftResponse.data.draft;
+
+                // Parse form data
+                if (draft.formData) {
+                    const parsedFormData = safeJsonParse<FormState>(draft.formData, {});
+                    initialFormData = { ...parsedFormData };
+                }
+
+                // Parse and restore files metadata - THIS IS THE KEY PART
+                if (draft.filesMetadata) {
+                    const parsedFilesMetadata = safeJsonParse<Record<string, FileMeta>>(draft.filesMetadata, {});
+
+                    // Process each file metadata entry
+                    Object.entries(parsedFilesMetadata).forEach(([key, meta]) => {
+                        if (meta && typeof meta === 'object' && meta.file_path) {
+                            // Store the complete metadata
+                            initialFilesMetadata[key] = {
+                                filename: meta.filename || '',
+                                original_name: meta.original_name || meta.filename || '',
+                                file_path: meta.file_path,
+                                size: meta.size,
+                                type: meta.type,
+                                uploaded_at: meta.uploaded_at
+                            };
+
+                            // IMPORTANT: Update formData to show the filename
+                            // This ensures the file input shows it has a file
+                            initialFormData[key] = meta.original_name || meta.filename || 'File uploaded';
                         }
                     });
                 }
+
+                // Restore step information
+                if (draft.currentStep !== undefined) restoredCurrentStep = draft.currentStep;
+                if (draft.completedSteps) restoredCompletedSteps = safeJsonParse<number[]>(draft.completedSteps, []);
+                if (draft.updated_at) restoredLastSaved = draft.updated_at;
+            }
+
+            // Apply profile data mappings (only if field is empty)
+            const profileMappings: Record<string, string[]> = {
+                first_name: ['first name'],
+                last_name: ['last name'],
+                middle_name: ['middle name'],
+                email: ['email'],
+                phone: ['phone'],
+                date_of_birth: ['date of birth','dob'],
+                gender: ['gender','sex'],
+                country: ['country','nationality'],
+                address: ['address','residential address']
+            };
+
+            categoriesArray.forEach(cat => {
+                cat.questions.forEach(q => {
+                    const lower = q.question_text.toLowerCase();
+                    Object.entries(profileMappings).forEach(([field, keys]) => {
+                        if (keys.some(k => lower.includes(k))) {
+                            const questionKey = `question_${q.id}`;
+                            if (!initialFormData[questionKey] && profileData[field]) {
+                                initialFormData[questionKey] = profileData[field];
+                            }
+                        }
+                    });
+                });
             });
 
+            // Set all state at once
             setFormData(initialFormData);
-            setCurrentStep(progress.currentStep || 0);
-            setCompletedSteps(progress.completedSteps || []);
-            setFilesMetadata(progress.filesMetadata || {});
-            setLastSaved(progress.lastSaved);
+            setFilesMetadata(initialFilesMetadata);
+            setFiles({}); // Clear local files since uploaded files are on server
 
-            if (progress.lastSaved) {
-                toast.success('Previous progress loaded successfully');
+            // Set navigation state
+            if (!isEditMode && restoredLastSaved) {
+                setCurrentStep(restoredCurrentStep);
+                setCompletedSteps(restoredCompletedSteps);
+                setLastSaved(restoredLastSaved);
+
+                // Log what was restored for debugging
+                console.log('Restored files metadata:', initialFilesMetadata);
+                toast.success('Draft restored successfully');
+            } else if (isEditMode) {
+                // Reset navigation for edit mode
+                setCurrentStep(0);
+                setCompletedSteps([]);
+                toast.success('Application loaded for editing');
+            } else {
+                toast.success('Form initialized');
             }
-            if (Object.keys(initialFormData).length > 0) {
-                toast.success('Profile data loaded successfully');
-            }
-        } catch (error) {
-            console.error('Failed to initialize form:', error);
-            toast.error('Failed to load application form or profile');
+
+        } catch (e) {
+            console.error('Initialization error', e);
+            toast.error('Failed to load form');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const saveProgress = useCallback(async (showNotification = true) => {
-        if (isSaving) return;
-        setIsSaving(true);
-
-        try {
-            const formDataObj = new FormData();
-            formDataObj.append('formData', JSON.stringify(formData));
-            formDataObj.append('currentStep', currentStep.toString());
-            formDataObj.append('completedSteps', JSON.stringify(completedSteps));
-
-            Object.keys(files).forEach(key => {
-                if (files[key] && !filesMetadata[key]) {
-                    formDataObj.append(key, files[key]);
-                }
-            });
-
-            await api.post('/applicant/application/save-progress', formDataObj, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-
-            setLastSaved(new Date().toISOString());
-            if (showNotification) {
-                toast.success('Progress saved successfully');
-            }
-        } catch (error) {
-            if (showNotification) {
-                toast.error('Failed to save progress');
-            }
-        } finally {
-            setIsSaving(false);
-        }
-    }, [formData, files, filesMetadata, currentStep, completedSteps, isSaving]);
+    const shouldShowQuestion = (question: Question) => {
+        if (!question.conditional_logic) return true;
+        const { question_id, value } = question.conditional_logic;
+        const dep = formData[`question_${question_id}`];
+        return dep === value;
+    };
 
     const validateCurrentStep = () => {
-        if (categories.length === 0 || !categories[currentStep]) return;
-
+        if (!categories[currentStep]) return;
         const currentCategory = categories[currentStep];
         const requiredQuestions = currentCategory.questions.filter(q => q.is_required && shouldShowQuestion(q));
-        let isValid = requiredQuestions.every(question => {
-            const value = formData[`question_${question.id}`];
-            if (question.question_type === 'file') {
-                return true; // Skip file validation for non-qualification file uploads
+        let valid = requiredQuestions.every(q => {
+            const val = formData[`question_${q.id}`];
+            if (q.question_type === 'file') {
+                const meta = filesMetadata[`question_${q.id}`];
+                const file = files[`question_${q.id}`];
+                return !!(meta?.file_path || file);
             }
-            if (question.question_type === 'multiple_select') {
-                return Array.isArray(value) && value.length > 0;
-            }
-            if (question.question_type === 'table') {
-                const tableData = Array.isArray(value) ? value : [];
-                return tableData.length > 0 && tableData.every(row =>
-                    question.table_columns?.every(col =>
-                        !col.is_required || (row[col.name] && row[col.name].toString().trim() !== '')
-                    )
+            if (q.question_type === 'multiple_select') return Array.isArray(val) && val.length > 0;
+            if (q.question_type === 'table') {
+                const rows = Array.isArray(val) ? val as TableRowData[] : [];
+                return rows.length > 0 && rows.every(r =>
+                    q.table_columns?.every(c => c.is_required ? (r[c.name] ?? '').toString().trim() !== '' : true)
                 );
             }
-            return value !== undefined && value !== null && value.toString().trim() !== '';
+            return val !== undefined && val !== null && val.toString().trim() !== '';
         });
 
-        // Special validation for table mins
         if (currentCategory.name === 'Academic History') {
-            const schoolQuestion = currentCategory.questions.find(q => q.question_text === 'Schools Attended');
-            if (schoolQuestion) {
-                const tableData = formData[`question_${schoolQuestion.id}`] || [];
-                if (tableData.length === 0) isValid = false;
+            const schoolQ = currentCategory.questions.find(q => q.question_text.toLowerCase().includes('schools attended'));
+            if (schoolQ) {
+                const rows = formData[`question_${schoolQ.id}`];
+                if (!Array.isArray(rows) || rows.length === 0) valid = false;
             }
         }
-
         if (currentCategory.name === 'Additional Information') {
-            const refQuestion = currentCategory.questions.find(q => q.question_text === 'References (at least 2)');
-            if (refQuestion) {
-                const tableData = formData[`question_${refQuestion.id}`] || [];
-                if (tableData.length < 2) isValid = false;
+            const refQ = currentCategory.questions.find(q => q.question_text.toLowerCase().includes('references'));
+            if (refQ) {
+                const rows = formData[`question_${refQ.id}`];
+                if (!Array.isArray(rows) || rows.length < 2) valid = false;
             }
         }
-
-        // Validate Financial Information category
         if (currentCategory.name === 'Financial Information') {
-            const fundingQuestion = currentCategory.questions.find(q => q.question_text === 'Method of Funding');
-            const funding = formData[`question_${fundingQuestion?.id}`];
-            let isFinancialValid = true;
+            const fundingQ = currentCategory.questions.find(q => q.question_text === 'Method of Funding');
+            const funding = fundingQ ? formData[`question_${fundingQ.id}`] : '';
             if (funding === 'Sponsor') {
-                const nameQuestion = currentCategory.questions.find(q => q.question_text.includes('Sponsor Name'));
-                const relQuestion = currentCategory.questions.find(q => q.question_text.includes('Sponsor Relationship'));
-                const phoneQuestion = currentCategory.questions.find(q => q.question_text.includes('Sponsor Phone'));
-                const hasSponsorName = formData[`question_${nameQuestion?.id}`]?.trim();
-                const hasSponsorRelationship = formData[`question_${relQuestion?.id}`]?.trim();
-                const hasSponsorPhone = formData[`question_${phoneQuestion?.id}`]?.trim();
-                isFinancialValid = hasSponsorName && hasSponsorRelationship && hasSponsorPhone;
+                const required = ['name','relationship','phone'];
+                required.forEach(key => {
+                    const match = currentCategory.questions.find(q => q.question_text.toLowerCase().includes(`sponsor ${key}`));
+                    if (match) {
+                        const v = (formData[`question_${match.id}`] || '').toString().trim();
+                        if (!v) valid = false;
+                    }
+                });
             }
-            isValid = isValid && isFinancialValid;
         }
 
-        // Validate qualification-specific fields
-        const qualificationType = formData[`question_${currentCategory.questions.find(q => q.question_text.toLowerCase().includes('qualification type'))?.id}`];
+        const qualQuestion = currentCategory.questions.find(q =>
+            q.question_text.toLowerCase().includes('qualification type') ||
+            q.question_text.toLowerCase().includes('certificate type')
+        );
+        const qualificationType = qualQuestion ? formData[`question_${qualQuestion.id}`] : undefined;
+
         if (qualificationType === 'WASSCE') {
-            const isWassceValid = Array.from({ length: wassceSittings }, (_, sittingIndex) => {
-                const sittingKey = sittingIndex + 1;
-                const hasResults = wassceResults[sittingIndex]?.length > 0;
-                const hasScratchCardPin = formData[`wassce_sitting_${sittingKey}_scratch_card_pin`]?.trim();
-                const hasScratchCardNumber = formData[`wassce_sitting_${sittingKey}_scratch_card_number`]?.trim();
-                const hasSchoolName = formData[`wassce_sitting_${sittingKey}_school_name`]?.trim();
-                const hasDistrict = formData[`wassce_sitting_${sittingKey}_district`]?.trim();
-                const hasCountry = formData[`wassce_sitting_${sittingKey}_country`]?.trim();
-                const hasYearSat = formData[`wassce_sitting_${sittingKey}_year_sat`]?.trim();
-                const hasFile = files[`question_wassce_sitting_${sittingKey}_result`] || filesMetadata[`question_wassce_sitting_${sittingKey}_result`];
-                return hasResults && hasScratchCardPin && hasScratchCardNumber && hasSchoolName && hasDistrict && hasCountry && hasYearSat && hasFile;
+            const wassceValid = Array.from({ length: wassceSittings }, (_, idx) => {
+                const sit = idx + 1;
+                const resultsOk = wassceResults[idx]?.length > 0 && wassceResults[idx].every(r => r.subject && r.grade);
+                const pin = (formData[`wassce_sitting_${sit}_scratch_card_pin`] || '').toString().trim();
+                const num = (formData[`wassce_sitting_${sit}_scratch_card_number`] || '').toString().trim();
+                const school = (formData[`wassce_sitting_${sit}_school_name`] || '').toString().trim();
+                const dist = (formData[`wassce_sitting_${sit}_district`] || '').toString().trim();
+                const country = (formData[`wassce_sitting_${sit}_country`] || '').toString().trim();
+                const year = (formData[`wassce_sitting_${sit}_year_sat`] || '').toString().trim();
+                const statementMeta = filesMetadata[`question_wassce_sitting_${sit}_statement`];
+                const statementFile = files[`question_wassce_sitting_${sit}_statement`];
+                const fileOk = !!statementMeta?.file_path || !!statementFile;
+                return resultsOk && pin && num && school && dist && country && year && fileOk;
             }).every(Boolean);
-            isValid = isValid && isWassceValid;
-        } else if (['Degree', 'Diploma', 'Certificate'].includes(qualificationType)) {
-            const qualKey = qualificationType.toLowerCase();
-            const hasGraduationYear = formData[`${qualKey}_graduation_year`]?.trim();
-            const hasInstitutionName = formData[`${qualKey}_institution_name`]?.trim();
-            const hasDistrict = formData[`${qualKey}_district`]?.trim();
-            const hasCountry = formData[`${qualKey}_country`]?.trim();
-            // Certificate and testimonial files are optional, so exclude from validation
-            const isQualValid = hasGraduationYear && hasInstitutionName && hasDistrict && hasCountry;
-            isValid = isValid && isQualValid;
+            valid = valid && wassceValid;
+        } else if (['Degree','Diploma','Certificate'].includes(String(qualificationType))) {
+            const key = String(qualificationType).toLowerCase();
+            const grad = (formData[`${key}_graduation_year`] || '').toString().trim();
+            const inst = (formData[`${key}_institution_name`] || '').toString().trim();
+            const dist = (formData[`${key}_district`] || '').toString().trim();
+            const ct = (formData[`${key}_country`] || '').toString().trim();
+            if (!(grad && inst && dist && ct)) valid = false;
         }
 
-        setCanProceed(isValid);
+        setCanProceed(valid);
     };
 
-    const prevStep = () => {
-        if (currentStep > 0) {
-            setCurrentStep(currentStep - 1);
-        }
-    };
-
+    const prevStep = () => currentStep > 0 && setCurrentStep(s => s - 1);
     const nextStep = () => {
-        if (canProceed && currentStep < categories.length - 1) {
+        if (!canProceed) return;
+        if (currentStep < categories.length - 1) {
             setCompletedSteps(prev => [...new Set([...prev, currentStep])]);
-            setCurrentStep(currentStep + 1);
+            setCurrentStep(s => s + 1);
         }
     };
-
     const goToStep = (step: number) => {
         if (step >= 0 && step < categories.length && (step <= currentStep || completedSteps.includes(step))) {
             setCurrentStep(step);
@@ -397,984 +684,840 @@ export default function MultiStepperForm() {
     const submitApplication = async () => {
         if (!canProceed) return;
         setIsSubmitting(true);
-
         try {
-            const formDataObj = new FormData();
-            formDataObj.append('formData', JSON.stringify(formData));
-            Object.keys(files).forEach(key => {
-                if (files[key] && !filesMetadata[key]) {
-                    formDataObj.append(key, files[key]);
+            const fd = new FormData();
+            fd.append('formData', JSON.stringify(formData));
+
+            Object.keys(files).forEach(k => {
+                if (files[k] && !filesMetadata[k]?.file_path) {
+                    fd.append(k, files[k]);
                 }
             });
 
-            const response = await api.post('/applicant/application/submit', formDataObj, {
+            const res = await api.post('/applicant/application/submit', fd, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            setSubmittedApplication(response.data.application);
+            setSubmittedApplication(res.data.application);
+            setApplicationNumber(res.data.application_number || res.data.application?.application_number);
             setIsEditMode(false);
-            toast.success('Application submitted successfully');
-        } catch (error) {
-            console.error('Failed to submit application:', error);
-            toast.error('Failed to submit application');
+            toast.success('Application submitted');
+        } catch (e) {
+            console.error(e);
+            toast.error('Submit failed');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleEditApplication = async () => {
+    const handleEditApplication = () => {
         setIsEditMode(true);
         setSubmittedApplication(null);
-        await initializeForm();
+        setWassceSittings(1);
+        setAlevelSittings(1);
+        setWassceResults([[]]);
+        setAlevelResults([[]]);
+        setFormData({});
+        setFiles({});
+        setFilesMetadata({});
+        initializeForm();
     };
 
     const handlePrint = () => {
-        if (printRef.current) {
-            const printContent = printRef.current.innerHTML;
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-                printWindow.document.write(`
-          <html>
-            <head>
-              <title>Print Application</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                .category-title { font-size: 1.5rem; margin: 1rem 0; }
-                .question { margin-bottom: 1rem; }
-                .question-text { font-weight: bold; }
-                .answer { margin-left: 1rem; }
-                .file-info { color: blue; }
-              </style>
-            </head>
-            <body>
-              <h1>Application Form</h1>
-              ${printContent}
-            </body>
-          </html>
-        `);
-                printWindow.document.close();
-                printWindow.print();
+        if (!categories.length && !submittedApplication) return;
+
+        // Use submitted application data if available, otherwise use current form data
+        const printData = submittedApplication || {
+            categories: categories.reduce((acc, cat) => {
+                acc[cat.name] = cat.questions
+                    .filter(shouldShowQuestion)
+                    .map(q => ({
+                        question_id: q.id,
+                        question_text: q.question_text,
+                        answer: formData[`question_${q.id}`] || '',
+                        question_type: q.question_type,
+                        file_path: filesMetadata[`question_${q.id}`]?.file_path
+                    }));
+                return acc;
+            }, {} as Record<string, any>)
+        };
+
+        const html = `
+    <html>
+      <head>
+        <title>Application Print</title>
+        <style>
+          body { font-family: Arial, sans-serif; font-size:12px; line-height:1.4; color:#111; }
+          h1 { font-size:20px; margin-bottom:8px; }
+          h2 { background:#f1f5f9; padding:4px 8px; margin-top:18px; font-size:16px; }
+          .q { margin:6px 0; }
+          .label { font-weight:600; }
+          table { border-collapse: collapse; width:100%; margin:8px 0; }
+          th, td { border:1px solid #999; padding:4px 6px; font-size:11px; }
+          .file-block { border:1px solid #ddd; padding:6px; margin:4px 0; }
+          .file-preview img { max-width:260px; max-height:180px; display:block; margin:4px 0; }
+          .flex-grid { display:flex; flex-wrap:wrap; gap:8px; }
+          .tag { background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:11px; }
+          .answer-text { white-space:pre-wrap; }
+          @media print { .page-break { page-break-after:always; } }
+        </style>
+      </head>
+      <body>
+        <h1>Application Summary</h1>
+        <div><strong>Application ID:</strong> ${applicationNumber || 'Draft'}</div>
+        <div><strong>Printed:</strong> ${new Date().toLocaleString()}</div>
+        <div><strong>Status:</strong> ${submittedApplication ? 'Submitted' : 'Draft'}</div>
+        ${Object.entries(printData.categories).map(([catName, answers]) => `
+          <section>
+            <h2>${catName}</h2>
+            ${answers.map((ans: any) => {
+            if (ans.question_type === 'table') {
+                const rows = Array.isArray(ans.answer) ? ans.answer :
+                    typeof ans.answer === 'string' ? safeJsonParse(ans.answer, []) : [];
+                if (!rows.length) return '';
+
+                const question = categories.flatMap(c => c.questions).find(q => q.id === ans.question_id);
+                const cols = question?.table_columns || [];
+
+                return `
+                      <div class="q">
+                        <div class="label">${ans.question_text}</div>
+                        <table>
+                          <thead>
+                            <tr>${cols.map(c => `<th>${c.name}</th>`).join('')}</tr>
+                          </thead>
+                          <tbody>
+                            ${rows.map((row: any) => `
+                              <tr>${cols.map(c => `<td>${(row[c.name] || '').toString().replace(/</g,'&lt;')}</td>`).join('')}</tr>
+                            `).join('')}
+                          </tbody>
+                        </table>
+                      </div>
+                    `;
             }
-        }
+
+            if (ans.question_type === 'multiple_select') {
+                const arr = Array.isArray(ans.answer) ? ans.answer :
+                    typeof ans.answer === 'string' ? ans.answer.split(',').map(s => s.trim()) : [];
+                return `
+                      <div class="q">
+                        <div class="label">${ans.question_text}</div>
+                        <div class="flex-grid">
+                          ${arr.map(item => `<span class="tag">${item.replace(/</g,'&lt;')}</span>`).join('')}
+                        </div>
+                      </div>
+                    `;
+            }
+
+            if (ans.question_type === 'file') {
+                const meta = filesMetadata[`question_${ans.question_id}`];
+                const fUrl = resolveFileUrl(meta);
+
+                if (!meta && !ans.file_path) return `
+                      <div class="q">
+                        <div class="label">${ans.question_text}</div>
+                        <div>No file uploaded</div>
+                      </div>
+                    `;
+
+                const fileUrl = ans.file_path || fUrl;
+                const fileName = meta?.original_name || extractFilename(ans.file_path || '');
+                const embed = fileUrl && isImage(fileName) ?
+                    `<div class="file-preview"><img src="${fileUrl}" alt="${fileName}"/></div>` : '';
+
+                return `
+                      <div class="q">
+                        <div class="label">${ans.question_text}</div>
+                        <div class="file-block">
+                          <div><strong>File:</strong> ${fileName}</div>
+                          ${embed}
+                        </div>
+                      </div>
+                    `;
+            }
+
+            return `
+                  <div class="q">
+                    <div class="label">${ans.question_text}</div>
+                    <div class="answer-text">${(ans.answer || '').toString().replace(/</g,'&lt;')}</div>
+                  </div>
+                `;
+        }).join('')}
+          </section>
+        `).join('')}
+      </body>
+    </html>
+    `;
+
+        const win = window.open('', '_blank');
+        if (!win) return;
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 400);
     };
 
-    const handleInputChange = (questionId: number | string, value: string | string[] | number) => {
-        setFormData(prev => ({
-            ...prev,
-            [`question_${questionId}`]: value
-        }));
+    const handleInputChange = (questionId: number | string, value: any) => {
+        setFormData(prev => ({ ...prev, [`question_${questionId}`]: value }));
     };
 
     const handleQualificationChange = (questionId: number, value: string) => {
         handleInputChange(questionId, value);
-
-        // Reset sitting counts, results, and related fields when qualification type changes
         setWassceSittings(1);
-        setWassceResults([[]]);
         setAlevelSittings(1);
+        setWassceResults([[]]);
         setAlevelResults([[]]);
         setFormData(prev => {
-            const newFormData = { ...prev };
-            Object.keys(newFormData).forEach(key => {
-                if (key.startsWith('wassce_sitting_') || key.startsWith('alevel_sitting_') ||
-                    key.startsWith('degree_') || key.startsWith('diploma_') || key.startsWith('certificate_')) {
-                    delete newFormData[key];
-                }
+            const next = { ...prev };
+            Object.keys(next).forEach(k => {
+                if (k.startsWith('wassce_') || k.startsWith('alevel_') || k.startsWith('degree_') ||
+                    k.startsWith('diploma_') || k.startsWith('certificate_')) delete next[k];
             });
-            return newFormData;
+            return next;
         });
         setFiles(prev => {
-            const newFiles = { ...prev };
-            Object.keys(newFiles).forEach(key => {
-                if (key.startsWith('wassce_sitting_') || key.startsWith('alevel_sitting_') ||
-                    key.startsWith('degree_') || key.startsWith('diploma_') || key.startsWith('certificate_')) {
-                    delete newFiles[key];
-                }
+            const nf = { ...prev };
+            Object.keys(nf).forEach(k => {
+                if (k.includes('_wassce_') || k.includes('_alevel_') || k.includes('_degree_') ||
+                    k.includes('_diploma_') || k.includes('_certificate_')) delete nf[k];
             });
-            return newFiles;
+            return nf;
         });
         setFilesMetadata(prev => {
-            const newMetadata = { ...prev };
-            Object.keys(newMetadata).forEach(key => {
-                if (key.startsWith('wassce_sitting_') || key.startsWith('alevel_sitting_') ||
-                    key.startsWith('degree_') || key.startsWith('diploma_') || key.startsWith('certificate_')) {
-                    delete newMetadata[key];
-                }
+            const nm = { ...prev };
+            Object.keys(nm).forEach(k => {
+                if (k.includes('_wassce_') || k.includes('_alevel_') || k.includes('_degree_') ||
+                    k.includes('_diploma_') || k.includes('_certificate_')) delete nm[k];
             });
-            return newMetadata;
+            return nm;
         });
     };
 
     const handleSittingsChange = (type: 'WASSCE' | 'A-Level', sittings: number) => {
         if (type === 'WASSCE') {
             setWassceSittings(sittings);
-            setWassceResults(Array(sittings).fill(null).map(() => []));
-            // Clear formData and files for unused sittings
-            setFormData(prev => {
-                const newFormData = { ...prev };
-                for (let i = sittings + 1; i <= 2; i++) {
-                    delete newFormData[`wassce_sitting_${i}_scratch_card_pin`];
-                    delete newFormData[`wassce_sitting_${i}_scratch_card_number`];
-                    delete newFormData[`wassce_sitting_${i}_school_name`];
-                    delete newFormData[`wassce_sitting_${i}_district`];
-                    delete newFormData[`wassce_sitting_${i}_country`];
-                    delete newFormData[`wassce_sitting_${i}_year_sat`];
-                    delete newFormData[`wassce_results_sitting_${i}`];
-                    delete newFormData[`wassce_sitting_${i}_testimonial`];
-                }
-                return newFormData;
-            });
-            setFiles(prev => {
-                const newFiles = { ...prev };
-                for (let i = sittings + 1; i <= 2; i++) {
-                    delete newFiles[`question_wassce_sitting_${i}_result`];
-                    delete newFiles[`question_wassce_sitting_${i}_testimonial`];
-                }
-                return newFiles;
-            });
-            setFilesMetadata(prev => {
-                const newMetadata = { ...prev };
-                for (let i = sittings + 1; i <= 2; i++) {
-                    delete newMetadata[`question_wassce_sitting_${i}_result`];
-                    delete newMetadata[`question_wassce_sitting_${i}_testimonial`];
-                }
-                return newMetadata;
-            });
+            setWassceResults(Array.from({ length: sittings }, () => []));
         } else {
             setAlevelSittings(sittings);
-            setAlevelResults(Array(sittings).fill(null).map(() => []));
-            setFormData(prev => {
-                const newFormData = { ...prev };
-                for (let i = sittings + 1; i <= 3; i++) {
-                    delete newFormData[`alevel_results_sitting_${i}`];
-                }
-                return newFormData;
-            });
+            setAlevelResults(Array.from({ length: sittings }, () => []));
         }
     };
 
     const addSubjectGrade = (type: 'WASSCE' | 'A-Level', sittingIndex: number) => {
         if (type === 'WASSCE') {
-            const newResults = [...wassceResults];
-            newResults[sittingIndex] = [...(newResults[sittingIndex] || []), { subject: '', grade: '' }];
-            setWassceResults(newResults);
-
-            // Update form data
-            setFormData(prev => ({
-                ...prev,
-                [`wassce_results_sitting_${sittingIndex + 1}`]: newResults[sittingIndex]
-            }));
+            const copy = [...wassceResults];
+            copy[sittingIndex] = [...(copy[sittingIndex] || []), { subject: '', grade: '' }];
+            setWassceResults(copy);
+            setFormData(prev => ({ ...prev, [`wassce_results_sitting_${sittingIndex + 1}`]: copy[sittingIndex] }));
         } else {
-            const newResults = [...alevelResults];
-            newResults[sittingIndex] = [...(newResults[sittingIndex] || []), { subject: '', grade: '' }];
-            setAlevelResults(newResults);
-
-            // Update form data
-            setFormData(prev => ({
-                ...prev,
-                [`alevel_results_sitting_${sittingIndex + 1}`]: newResults[sittingIndex]
-            }));
+            const copy = [...alevelResults];
+            copy[sittingIndex] = [...(copy[sittingIndex] || []), { subject: '', grade: '' }];
+            setAlevelResults(copy);
+            setFormData(prev => ({ ...prev, [`alevel_results_sitting_${sittingIndex + 1}`]: copy[sittingIndex] }));
         }
     };
 
-    const updateSubjectGrade = (type: 'WASSCE' | 'A-Level', sittingIndex: number, resultIndex: number, field: 'subject' | 'grade', value: string) => {
+    const updateSubjectGrade = (
+        type: 'WASSCE' | 'A-Level',
+        sittingIndex: number,
+        resultIndex: number,
+        field: 'subject' | 'grade',
+        value: string
+    ) => {
         if (type === 'WASSCE') {
-            const newResults = [...wassceResults];
-            if (!newResults[sittingIndex]) newResults[sittingIndex] = [];
-            if (!newResults[sittingIndex][resultIndex]) newResults[sittingIndex][resultIndex] = { subject: '', grade: '' };
-            newResults[sittingIndex][resultIndex][field] = value;
-            setWassceResults(newResults);
-
-            // Update form data
-            setFormData(prev => ({
-                ...prev,
-                [`wassce_results_sitting_${sittingIndex + 1}`]: newResults[sittingIndex]
-            }));
+            const copy = [...wassceResults];
+            if (!copy[sittingIndex]) copy[sittingIndex] = [];
+            if (!copy[sittingIndex][resultIndex]) copy[sittingIndex][resultIndex] = { subject: '', grade: '' };
+            copy[sittingIndex][resultIndex][field] = value;
+            setWassceResults(copy);
+            setFormData(prev => ({ ...prev, [`wassce_results_sitting_${sittingIndex + 1}`]: copy[sittingIndex] }));
         } else {
-            const newResults = [...alevelResults];
-            if (!newResults[sittingIndex]) newResults[sittingIndex] = [];
-            if (!newResults[sittingIndex][resultIndex]) newResults[sittingIndex][resultIndex] = { subject: '', grade: '' };
-            newResults[sittingIndex][resultIndex][field] = value;
-            setAlevelResults(newResults);
-
-            // Update form data
-            setFormData(prev => ({
-                ...prev,
-                [`alevel_results_sitting_${sittingIndex + 1}`]: newResults[sittingIndex]
-            }));
+            const copy = [...alevelResults];
+            if (!copy[sittingIndex]) copy[sittingIndex] = [];
+            if (!copy[sittingIndex][resultIndex]) copy[sittingIndex][resultIndex] = { subject: '', grade: '' };
+            copy[sittingIndex][resultIndex][field] = value;
+            setAlevelResults(copy);
+            setFormData(prev => ({ ...prev, [`alevel_results_sitting_${sittingIndex + 1}`]: copy[sittingIndex] }));
         }
     };
 
     const removeSubjectGrade = (type: 'WASSCE' | 'A-Level', sittingIndex: number, resultIndex: number) => {
         if (type === 'WASSCE') {
-            const newResults = [...wassceResults];
-            newResults[sittingIndex] = newResults[sittingIndex].filter((_, idx) => idx !== resultIndex);
-            setWassceResults(newResults);
-
-            // Update form data
-            setFormData(prev => ({
-                ...prev,
-                [`wassce_results_sitting_${sittingIndex + 1}`]: newResults[sittingIndex]
-            }));
+            const copy = [...wassceResults];
+            copy[sittingIndex] = copy[sittingIndex].filter((_, i) => i !== resultIndex);
+            setWassceResults(copy);
+            setFormData(prev => ({ ...prev, [`wassce_results_sitting_${sittingIndex + 1}`]: copy[sittingIndex] }));
         } else {
-            const newResults = [...alevelResults];
-            newResults[sittingIndex] = newResults[sittingIndex].filter((_, idx) => idx !== resultIndex);
-            setAlevelResults(newResults);
-
-            // Update form data
-            setFormData(prev => ({
-                ...prev,
-                [`alevel_results_sitting_${sittingIndex + 1}`]: newResults[sittingIndex]
-            }));
+            const copy = [...alevelResults];
+            copy[sittingIndex] = copy[sittingIndex].filter((_, i) => i !== resultIndex);
+            setAlevelResults(copy);
+            setFormData(prev => ({ ...prev, [`alevel_results_sitting_${sittingIndex + 1}`]: copy[sittingIndex] }));
         }
     };
 
     const validateFileSize = (file: File): boolean => {
-        const maxSize = 10 * 1024 * 1024; // 10MB
-        if (file.size > maxSize) {
-            toast.error(`File "${file.name}" is too large. Maximum size is 10MB.`);
+        const max = 10 * 1024 * 1024;
+        if (file.size > max) {
+            toast.error(`File "${file.name}" too large (max 10MB)`);
             return false;
         }
         return true;
     };
 
-    const handleFileChange = (questionId: number | string, file: File) => {
-        if (!validateFileSize(file)) {
-            return;
-        }
+    // const handleFileChange = async (questionId: number | string, file: File) => {
+    //     if (!validateFileSize(file)) return;
+    //
+    //     const key = `question_${questionId}`;
+    //
+    //     try {
+    //         const fd = new FormData();
+    //         fd.append('file', file);
+    //
+    //         const response = await api.post('/applicant/application/upload-file', fd, {
+    //             headers: { 'Content-Type': 'multipart/form-data' }
+    //         });
+    //
+    //         if (response.data.success && response.data.file_metadata) {
+    //             const metadata = response.data.file_metadata;
+    //
+    //             setFilesMetadata(prev => ({
+    //                 ...prev,
+    //                 [key]: metadata
+    //             }));
+    //
+    //             setFormData(prev => ({
+    //                 ...prev,
+    //                 [key]: metadata.original_name
+    //             }));
+    //
+    //             setFiles(prev => {
+    //                 const newFiles = { ...prev };
+    //                 delete newFiles[key];
+    //                 return newFiles;
+    //             });
+    //
+    //             toast.success(`File "${file.name}" uploaded successfully`);
+    //         }
+    //     } catch (error) {
+    //         console.error('File upload error:', error);
+    //         setFiles(prev => ({ ...prev, [key]: file }));
+    //         setFilesMetadata(prev => ({
+    //             ...prev,
+    //             [key]: {
+    //                 filename: file.name,
+    //                 original_name: file.name
+    //             }
+    //         }));
+    //         setFormData(prev => ({ ...prev, [key]: file.name }));
+    //         toast.warning(`File "${file.name}" queued for upload`);
+    //     }
+    // };
+    const handleFileChange = async (questionId: number | string, file: File) => {
+        if (!validateFileSize(file)) return;
 
-        setFiles(prev => ({
-            ...prev,
-            [`question_${questionId}`]: file
-        }));
-        setFilesMetadata(prev => ({
-            ...prev,
-            [`question_${questionId}`]: {
-                filename: file.name,
-                original_name: file.name
+        const key = typeof questionId === 'number' ? `question_${questionId}` : `question_${questionId}`;
+
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('question_key', key); // Send the question key
+
+            const response = await api.post('/applicant/application/upload-file', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            if (response.data.success && response.data.file_metadata) {
+                const metadata = response.data.file_metadata;
+
+                setFilesMetadata(prev => ({
+                    ...prev,
+                    [key]: metadata
+                }));
+
+                setFormData(prev => ({
+                    ...prev,
+                    [key]: metadata.original_name
+                }));
+
+                // Remove from local files since it's uploaded
+                setFiles(prev => {
+                    const newFiles = { ...prev };
+                    delete newFiles[key];
+                    return newFiles;
+                });
+
+                toast.success(`File "${file.name}" uploaded successfully`);
             }
-        }));
-        setFormData(prev => ({
-            ...prev,
-            [`question_${questionId}`]: file.name
-        }));
-        if (autoSaveEnabled) {
-            saveProgress();
+        } catch (error) {
+            console.error('File upload error:', error);
+            // Fallback to local storage
+            setFiles(prev => ({ ...prev, [key]: file }));
+            setFilesMetadata(prev => ({
+                ...prev,
+                [key]: {
+                    filename: file.name,
+                    original_name: file.name
+                }
+            }));
+            setFormData(prev => ({ ...prev, [key]: file.name }));
+            toast.warning(`File "${file.name}" queued for upload`);
         }
-        toast.success(`File "${file.name}" uploaded successfully`);
     };
 
     const removeFile = (questionId: number | string) => {
+        const key = `question_${questionId}`;
         setFiles(prev => {
-            const newFiles = { ...prev };
-            delete newFiles[`question_${questionId}`];
-            return newFiles;
+            const n = { ...prev }; delete n[key]; return n;
         });
         setFilesMetadata(prev => {
-            const newMetadata = { ...prev };
-            delete newMetadata[`question_${questionId}`];
-            return newMetadata;
+            const n = { ...prev }; delete n[key]; return n;
         });
         setFormData(prev => {
-            const newFormData = { ...prev };
-            delete newFormData[`question_${questionId}`];
-            return newFormData;
+            const n = { ...prev }; delete n[key]; return n;
         });
     };
 
     const handleTableInputChange = (questionId: number, rowIndex: number, columnName: string, value: string) => {
-        const currentData = formData[`question_${questionId}`] || [];
-        const newData = [...currentData];
-
-        if (!newData[rowIndex]) {
-            newData[rowIndex] = {};
-        }
-        newData[rowIndex][columnName] = value;
-
-        setFormData(prev => ({
-            ...prev,
-            [`question_${questionId}`]: newData
-        }));
+        const key = `question_${questionId}`;
+        const current = Array.isArray(formData[key]) ? ([...(formData[key] as TableRowData[])] as TableRowData[]) : [];
+        if (!current[rowIndex]) current[rowIndex] = {};
+        current[rowIndex][columnName] = value;
+        setFormData(prev => ({ ...prev, [key]: current }));
     };
 
     const addTableRow = (questionId: number, columns: Array<{ name: string }>) => {
-        const currentData = formData[`question_${questionId}`] || [];
-        const question = categories.flatMap(c => c.questions).find(q => q.id === questionId);
-        if (question && question.question_text.toLowerCase().includes('employment history') && currentData.length >= 3) {
-            toast.error('You can add up to 3 employment entries only.');
+        const key = `question_${questionId}`;
+        const current = Array.isArray(formData[key]) ? ([...(formData[key] as TableRowData[])] as TableRowData[]) : [];
+        const qDef = categories.flatMap(c => c.questions).find(q => q.id === questionId);
+        const isEmployment = qDef?.question_text.toLowerCase().includes('employment history');
+        if (isEmployment && current.length >= 3) {
+            toast.error('Maximum 3 employment entries');
             return;
         }
-        const newRow: TableRow = {};
-        columns.forEach(col => (newRow[col.name] = ''));
-
-        setFormData(prev => ({
-            ...prev,
-            [`question_${questionId}`]: [...currentData, newRow]
-        }));
+        const newRow: TableRowData = {};
+        columns.forEach(c => (newRow[c.name] = ''));
+        setFormData(prev => ({ ...prev, [key]: [...current, newRow] }));
     };
 
     const removeTableRow = (questionId: number, rowIndex: number) => {
-        const currentData = formData[`question_${questionId}`] || [];
-        const newData = currentData.filter((_, index) => index !== rowIndex);
-
-        setFormData(prev => ({
-            ...prev,
-            [`question_${questionId}`]: newData
-        }));
+        const key = `question_${questionId}`;
+        const current = Array.isArray(formData[key]) ? ([...(formData[key] as TableRowData[])] as TableRowData[]) : [];
+        setFormData(prev => ({ ...prev, [key]: current.filter((_, i) => i !== rowIndex) }));
     };
 
-    const handleFilePreview = (file: File | string) => {
+    const handleFilePreview = (file: File | string | undefined) => {
+        if (!file) return;
         if (file instanceof File) {
             const url = URL.createObjectURL(file);
-            const type = file.type.startsWith('image/') ? 'image' : 'pdf';
-            setPreviewFile({ url, type });
+            const type = file.type.startsWith('image/') ? 'image' : (file.type === 'application/pdf' ? 'pdf' : 'other');
+            setPreviewFile({ url, type, name: file.name });
         } else {
-            const url = `/api/files/${file}`;
-            const type = file.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image';
-            setPreviewFile({ url, type });
+            const url = file;
+            const lower = url.toLowerCase();
+            const type = lower.endsWith('.pdf') ? 'pdf' : (/\.(png|jpe?g|gif|webp|svg)$/.test(lower) ? 'image' : 'other');
+            setPreviewFile({ url, type, name: extractFilename(url) });
         }
+    };
+
+    const renderWassceSection = (sit: number, idx: number, resultList: QualificationResult[]) => {
+        const statementMeta = filesMetadata[`question_wassce_sitting_${sit}_statement`];
+        const statementFile = files[`question_wassce_sitting_${sit}_statement`];
+
+        return (
+            <div key={sit} className="border rounded-lg p-4 space-y-4">
+                <div className="font-semibold">Sitting {sit}</div>
+                <div className="grid md:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                        <Label htmlFor={`wassce_pin_${sit}`}>Scratch Card PIN</Label>
+                        <Input
+                            id={`wassce_pin_${sit}`}
+                            placeholder="Enter PIN"
+                            value={formData[`wassce_sitting_${sit}_scratch_card_pin`] || ''}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setFormData(prev => ({
+                                    ...prev,
+                                    [`wassce_sitting_${sit}_scratch_card_pin`]: value
+                                }));
+                            }}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor={`wassce_number_${sit}`}>Scratch Card Number</Label>
+                        <Input
+                            id={`wassce_number_${sit}`}
+                            placeholder="Enter Number"
+                            value={formData[`wassce_sitting_${sit}_scratch_card_number`] || ''}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setFormData(prev => ({
+                                    ...prev,
+                                    [`wassce_sitting_${sit}_scratch_card_number`]: value
+                                }));
+                            }}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor={`wassce_year_${sit}`}>Year Sat</Label>
+                    <Input
+                        id={`wassce_year_${sit}`}
+                        placeholder="e.g., 2023"
+                        value={formData[`wassce_sitting_${sit}_year_sat`] || ''}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setFormData(prev => ({
+                                ...prev,
+                                [`wassce_sitting_${sit}_year_sat`]: value
+                            }));
+                        }}
+                    />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor={`wassce_school_${sit}`}>School Name</Label>
+                    <Input
+                        id={`wassce_school_${sit}`}
+                        placeholder="Enter School Name"
+                        value={formData[`wassce_sitting_${sit}_school_name`] || ''}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setFormData(prev => ({
+                                ...prev,
+                                [`wassce_sitting_${sit}_school_name`]: value
+                            }));
+                        }}
+                    />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor={`wassce_district_${sit}`}>District</Label>
+                    <Input
+                        id={`wassce_district_${sit}`}
+                        placeholder="Enter District"
+                        value={formData[`wassce_sitting_${sit}_district`] || ''}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setFormData(prev => ({
+                                ...prev,
+                                [`wassce_sitting_${sit}_district`]: value
+                            }));
+                        }}
+                    />
+                </div>
+                <div className="space-y-1">
+                    <Label htmlFor={`wassce_country_${sit}`}>Country</Label>
+                    <Input
+                        id={`wassce_country_${sit}`}
+                        placeholder="Enter Country"
+                        value={formData[`wassce_sitting_${sit}_country`] || ''}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setFormData(prev => ({
+                                ...prev,
+                                [`wassce_sitting_${sit}_country`]: value
+                            }));
+                        }}
+                    />
+                </div>
+            </div>
+        <div>
+            <div className="flex items-center justify-between mb-2">
+                <Label>Subjects & Grades</Label>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => addSubjectGrade('WASSCE', idx)}
+                >
+                    <Plus className="w-3 h-3 mr-1" /> Add
+                </Button>
+            </div>
+            <div className="space-y-3">
+                {resultList.map((r, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                        <Select
+                            value={r.subject}
+                            onValueChange={v => updateSubjectGrade('WASSCE', idx, i, 'subject', v)}
+                        >
+                            <SelectTrigger className="w-56"><SelectValue placeholder="Subject" /></SelectTrigger>
+                            <SelectContent>
+                                {WASSCE_SUBJECTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Select
+                            value={r.grade}
+                            onValueChange={v => updateSubjectGrade('WASSCE', idx, i, 'grade', v)}
+                        >
+                            <SelectTrigger className="w-32"><SelectValue placeholder="Grade" /></SelectTrigger>
+                            <SelectContent>
+                                {WASSCE_GRADES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeSubjectGrade('WASSCE', idx, i)}
+                        >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                    </div>
+                ))}
+                {!resultList.length && <div className="text-sm text-muted-foreground">No subjects added yet.</div>}
+            </div>
+        </div>
+        <div className="space-y-2">
+            <Label>Statement of Results (Image/PDF)</Label>
+            <div className="flex items-center gap-4">
+                <Input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) handleFileChange(`wassce_sitting_${sit}_statement`, f);
+                    }}
+                />
+                {(statementFile || statementMeta) && (
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleFilePreview(statementMeta?.file_path || statementFile)}
+                        >
+                            <Eye className="w-4 h-4 mr-1" /> Preview
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => removeFile(`wassce_sitting_${sit}_statement`)}
+                        >
+                            <X className="w-4 h-4 mr-1" /> Remove
+                        </Button>
+                    </div>
+                )}
+            </div>
+            {statementMeta?.file_path && !statementFile && (
+                <div className="text-xs text-green-600">
+                    Existing file: {statementMeta.original_name}
+                </div>
+            )}
+        </div>
+    </div>
+    );
     };
 
     const renderQualificationResults = (question: Question) => {
         const qualificationType = formData[`question_${question.id}`];
-
         if (qualificationType === 'WASSCE') {
             return (
                 <div className="mt-4 space-y-6">
-                    <div>
-                        <Label className="text-base font-medium">Number of Sittings</Label>
+                    <div className="space-y-2">
+                        <Label>Number of Sittings (max 2)</Label>
                         <Select
-                            value={wassceSittings.toString()}
-                            onValueChange={(value) => handleSittingsChange('WASSCE', parseInt(value))}
+                            value={String(wassceSittings)}
+                            onValueChange={v => handleSittingsChange('WASSCE', parseInt(v, 10))}
                         >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select number of sittings" />
-                            </SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="1">1 Sitting</SelectItem>
-                                <SelectItem value="2">2 Sittings</SelectItem>
+                                {[1,2].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
-
-                    {Array.from({ length: wassceSittings }, (_, sittingIndex) => {
-                        const sittingKey = sittingIndex + 1;
-                        const selectedFile = files[`question_wassce_sitting_${sittingKey}_result`];
-                        const existingFile = filesMetadata[`question_wassce_sitting_${sittingKey}_result`];
-                        const selectedTestimonial = files[`question_wassce_sitting_${sittingKey}_testimonial`];
-                        const existingTestimonial = filesMetadata[`question_wassce_sitting_${sittingKey}_testimonial`];
+                    {Array.from({ length: wassceSittings }, (_, idx) => {
+                        const sit = idx + 1;
+                        const resultList = wassceResults[idx] || [];
+                        return renderWassceSection(sit, idx, resultList);
+                    })}
+                </div>
+            );
+        }
+        if (qualificationType === 'A-Level') {
+            return (
+                <div className="mt-4 space-y-6">
+                    <div className="space-y-2">
+                        <Label>Number of Sittings (max 3)</Label>
+                        <Select
+                            value={String(alevelSittings)}
+                            onValueChange={v => handleSittingsChange('A-Level', parseInt(v, 10))}
+                        >
+                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectContent>
+                                {[1,2,3].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {Array.from({ length: alevelSittings }, (_, idx) => {
+                        const sit = idx + 1;
+                        const resultList = alevelResults[idx] || [];
                         return (
-                            <div key={sittingIndex} className="space-y-4">
-                                <h4 className="text-lg font-medium">WASSCE Sitting {sittingIndex + 1}</h4>
-
-                                <Table className="border">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Subject</TableHead>
-                                            <TableHead>Grade</TableHead>
-                                            <TableHead>Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {(wassceResults[sittingIndex] || []).map((result, resultIndex) => (
-                                            <TableRow key={resultIndex}>
-                                                <TableCell>
-                                                    <Select
-                                                        value={result.subject}
-                                                        onValueChange={(value) => updateSubjectGrade('WASSCE', sittingIndex, resultIndex, 'subject', value)}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select subject" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {WASSCE_SUBJECTS.map((subject) => (
-                                                                <SelectItem key={subject} value={subject}>
-                                                                    {subject}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Select
-                                                        value={result.grade}
-                                                        onValueChange={(value) => updateSubjectGrade('WASSCE', sittingIndex, resultIndex, 'grade', value)}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select grade" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {WASSCE_GRADES.map((grade) => (
-                                                                <SelectItem key={grade} value={grade}>
-                                                                    {grade}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => removeSubjectGrade('WASSCE', sittingIndex, resultIndex)}
-                                                        className="text-red-600 hover:text-red-700"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
+                            <div key={sit} className="border rounded-lg p-4 space-y-4">
+                                <div className="font-semibold">Sitting {sit}</div>
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <Label>Subjects & Grades</Label>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => addSubjectGrade('A-Level', idx)}
+                                        >
+                                            <Plus className="w-3 h-3 mr-1" /> Add
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {resultList.map((r, i) => (
+                                            <div key={i} className="flex gap-2 items-center">
+                                                <Select
+                                                    value={r.subject}
+                                                    onValueChange={v => updateSubjectGrade('A-Level', idx, i, 'subject', v)}
+                                                >
+                                                    <SelectTrigger className="w-56"><SelectValue placeholder="Subject" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {A_LEVEL_SUBJECTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Select
+                                                    value={r.grade}
+                                                    onValueChange={v => updateSubjectGrade('A-Level', idx, i, 'grade', v)}
+                                                >
+                                                    <SelectTrigger className="w-32"><SelectValue placeholder="Grade" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {A_LEVEL_GRADES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    onClick={() => removeSubjectGrade('A-Level', idx, i)}
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                                </Button>
+                                            </div>
                                         ))}
-                                    </TableBody>
-                                </Table>
-
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => addSubjectGrade('WASSCE', sittingIndex)}
-                                    className="flex items-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add Subject
-                                </Button>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor={`wassce_sitting_${sittingKey}_school_name`} className="text-base font-medium flex items-center gap-2">
-                                        School Name <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input
-                                        id={`wassce_sitting_${sittingKey}_school_name`}
-                                        type="text"
-                                        value={formData[`wassce_sitting_${sittingKey}_school_name`] || ''}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            [`wassce_sitting_${sittingKey}_school_name`]: e.target.value
-                                        }))}
-                                        placeholder="Enter school name"
-                                        className="w-full"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor={`wassce_sitting_${sittingKey}_district`} className="text-base font-medium flex items-center gap-2">
-                                        District <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input
-                                        id={`wassce_sitting_${sittingKey}_district`}
-                                        type="text"
-                                        value={formData[`wassce_sitting_${sittingKey}_district`] || ''}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            [`wassce_sitting_${sittingKey}_district`]: e.target.value
-                                        }))}
-                                        placeholder="Enter district"
-                                        className="w-full"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor={`wassce_sitting_${sittingKey}_country`} className="text-base font-medium flex items-center gap-2">
-                                        Country <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input
-                                        id={`wassce_sitting_${sittingKey}_country`}
-                                        type="text"
-                                        value={formData[`wassce_sitting_${sittingKey}_country`] || ''}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            [`wassce_sitting_${sittingKey}_country`]: e.target.value
-                                        }))}
-                                        placeholder="Enter country"
-                                        className="w-full"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor={`wassce_sitting_${sittingKey}_year_sat`} className="text-base font-medium flex items-center gap-2">
-                                        Year Sat <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input
-                                        id={`wassce_sitting_${sittingKey}_year_sat`}
-                                        type="number"
-                                        value={formData[`wassce_sitting_${sittingKey}_year_sat`] || ''}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            [`wassce_sitting_${sittingKey}_year_sat`]: e.target.value
-                                        }))}
-                                        placeholder="Enter year (e.g., 2023)"
-                                        className="w-full"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor={`wassce_sitting_${sittingKey}_scratch_card_pin`} className="text-base font-medium flex items-center gap-2">
-                                        Scratch Card PIN <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input
-                                        id={`wassce_sitting_${sittingKey}_scratch_card_pin`}
-                                        type="text"
-                                        value={formData[`wassce_sitting_${sittingKey}_scratch_card_pin`] || ''}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            [`wassce_sitting_${sittingKey}_scratch_card_pin`]: e.target.value
-                                        }))}
-                                        placeholder="Enter scratch card PIN"
-                                        className="w-full"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor={`wassce_sitting_${sittingKey}_scratch_card_number`} className="text-base font-medium flex items-center gap-2">
-                                        Scratch Card Number <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input
-                                        id={`wassce_sitting_${sittingKey}_scratch_card_number`}
-                                        type="text"
-                                        value={formData[`wassce_sitting_${sittingKey}_scratch_card_number`] || ''}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            [`wassce_sitting_${sittingKey}_scratch_card_number`]: e.target.value
-                                        }))}
-                                        placeholder="Enter scratch card number"
-                                        className="w-full"
-                                        required
-                                    />
-                                    <p className="text-sm text-gray-500">
-                                        Please use a new or unused scratch card.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor={`wassce_sitting_${sittingKey}_result`} className="text-base font-medium flex items-center gap-2">
-                                        {wassceSittings === 1 ? 'WASSCE Result' : `WASSCE Result ${sittingKey}`} <span className="text-red-500">*</span>
-                                    </Label>
-                                    <div className="flex items-center gap-4">
-                                        <label className="flex-1">
-                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                                                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                                                <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                                                <p className="text-xs text-gray-500 mt-1">PDF, PNG, JPG up to 10MB</p>
-                                            </div>
-                                            <Input
-                                                type="file"
-                                                accept=".pdf,.png,.jpg,.jpeg"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) handleFileChange(`wassce_sitting_${sittingKey}_result`, file);
-                                                }}
-                                                className="hidden"
-                                                required={!(selectedFile || existingFile)}
-                                            />
-                                        </label>
+                                        {!resultList.length && <div className="text-sm text-muted-foreground">No subjects added yet.</div>}
                                     </div>
-                                    {(selectedFile || existingFile) && (
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <FileIcon className="w-5 h-5 text-blue-600" />
-                                                <span className="text-sm font-medium">
-                          {selectedFile ? selectedFile.name : existingFile?.filename}
-                        </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleFilePreview(selectedFile || existingFile?.filename)}
-                                                >
-                                                    <Eye className="w-4 h-4 mr-2" />
-                                                    Preview
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => removeFile(`wassce_sitting_${sittingKey}_result`)}
-                                                    className="text-red-600 hover:text-red-700"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor={`wassce_sitting_${sittingKey}_testimonial`} className="text-base font-medium flex items-center gap-2">
-                                        WASSCE Testimonial
-                                    </Label>
-                                    <div className="flex items-center gap-4">
-                                        <label className="flex-1">
-                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                                                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                                                <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                                                <p className="text-xs text-gray-500 mt-1">PDF, PNG, JPG up to 10MB</p>
-                                            </div>
-                                            <Input
-                                                type="file"
-                                                accept=".pdf,.png,.jpg,.jpeg"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) handleFileChange(`wassce_sitting_${sittingKey}_testimonial`, file);
-                                                }}
-                                                className="hidden"
-                                                required={false}
-                                            />
-                                        </label>
-                                    </div>
-                                    {(selectedTestimonial || existingTestimonial) && (
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <FileIcon className="w-5 h-5 text-blue-600" />
-                                                <span className="text-sm font-medium">
-                          {selectedTestimonial ? selectedTestimonial.name : existingTestimonial?.filename}
-                        </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleFilePreview(selectedTestimonial || existingTestimonial?.filename)}
-                                                >
-                                                    <Eye className="w-4 h-4 mr-2" />
-                                                    Preview
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => removeFile(`wassce_sitting_${sittingKey}_testimonial`)}
-                                                    className="text-red-600 hover:text-red-700"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         );
                     })}
                 </div>
             );
-        } else if (qualificationType === 'A-Level') {
-            return (
-                <div className="mt-4 space-y-6">
-                    <div>
-                        <Label className="text-base font-medium">Number of Sittings</Label>
-                        <Select
-                            value={alevelSittings.toString()}
-                            onValueChange={(value) => handleSittingsChange('A-Level', parseInt(value))}
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select number of sittings" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="1">1 Sitting</SelectItem>
-                                <SelectItem value="2">2 Sittings</SelectItem>
-                                <SelectItem value="3">3 Sittings</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {Array.from({ length: alevelSittings }, (_, sittingIndex) => (
-                        <div key={sittingIndex} className="space-y-4">
-                            <h4 className="text-lg font-medium">A-Level Sitting {sittingIndex + 1}</h4>
-
-                            <Table className="border">
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Subject</TableHead>
-                                        <TableHead>Grade</TableHead>
-                                        <TableHead>Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {(alevelResults[sittingIndex] || []).map((result, resultIndex) => (
-                                        <TableRow key={resultIndex}>
-                                            <TableCell>
-                                                <Select
-                                                    value={result.subject}
-                                                    onValueChange={(value) => updateSubjectGrade('A-Level', sittingIndex, resultIndex, 'subject', value)}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select subject" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {A_LEVEL_SUBJECTS.map((subject) => (
-                                                            <SelectItem key={subject} value={subject}>
-                                                                {subject}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Select
-                                                    value={result.grade}
-                                                    onValueChange={(value) => updateSubjectGrade('A-Level', sittingIndex, resultIndex, 'grade', value)}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select grade" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {A_LEVEL_GRADES.map((grade) => (
-                                                            <SelectItem key={grade} value={grade}>
-                                                                {grade}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => removeSubjectGrade('A-Level', sittingIndex, resultIndex)}
-                                                    className="text-red-600 hover:text-red-700"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => addSubjectGrade('A-Level', sittingIndex)}
-                                className="flex items-center gap-2"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Add Subject
-                            </Button>
-                        </div>
-                    ))}
-                </div>
-            );
-        } else if (['Degree', 'Diploma', 'Certificate'].includes(qualificationType)) {
-            const qualKey = qualificationType.toLowerCase();
-            const selectedFile = files[`question_${qualKey}_certificate`];
-            const existingFile = filesMetadata[`question_${qualKey}_certificate`];
-            const selectedTestimonial = files[`question_${qualKey}_testimonial`];
-            const existingTestimonial = filesMetadata[`question_${qualKey}_testimonial`];
+        }
+        if (['Degree','Diploma','Certificate'].includes(String(qualificationType))) {
+            const qualKey = String(qualificationType).toLowerCase();
+            const certMeta = filesMetadata[`question_${qualKey}_certificate`];
+            const certFile = files[`question_${qualKey}_certificate`];
+            const testMeta = filesMetadata[`question_${qualKey}_testimonial`];
+            const testFile = files[`question_${qualKey}_testimonial`];
             return (
                 <div className="mt-4 space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor={`${qualKey}_graduation_year`} className="text-base font-medium flex items-center gap-2">
-                            Graduation Year <span className="text-red-500">*</span>
-                        </Label>
+                    <div className="grid md:grid-cols-2 gap-4">
                         <Input
-                            id={`${qualKey}_graduation_year`}
-                            type="number"
-                            value={formData[`${qualKey}_graduation_year`] || ''}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                [`${qualKey}_graduation_year`]: e.target.value
-                            }))}
-                            placeholder="Enter graduation year (e.g., 2023)"
-                            className="w-full"
-                            required
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor={`${qualKey}_institution_name`} className="text-base font-medium flex items-center gap-2">
-                            College/University Name <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                            id={`${qualKey}_institution_name`}
-                            type="text"
+                            placeholder="Institution Name"
                             value={formData[`${qualKey}_institution_name`] || ''}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                [`${qualKey}_institution_name`]: e.target.value
-                            }))}
-                            placeholder="Enter college or university name"
-                            className="w-full"
-                            required
+                            onChange={e => handleInputChange(`${qualKey}_institution_name`, e.target.value)}
                         />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor={`${qualKey}_district`} className="text-base font-medium flex items-center gap-2">
-                            District <span className="text-red-500">*</span>
-                        </Label>
                         <Input
-                            id={`${qualKey}_district`}
-                            type="text"
+                            placeholder="District"
                             value={formData[`${qualKey}_district`] || ''}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                [`${qualKey}_district`]: e.target.value
-                            }))}
-                            placeholder="Enter district"
-                            className="w-full"
-                            required
+                            onChange={e => handleInputChange(`${qualKey}_district`, e.target.value)}
                         />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor={`${qualKey}_country`} className="text-base font-medium flex items-center gap-2">
-                            Country <span className="text-red-500">*</span>
-                        </Label>
                         <Input
-                            id={`${qualKey}_country`}
-                            type="text"
+                            placeholder="Country"
                             value={formData[`${qualKey}_country`] || ''}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                [`${qualKey}_country`]: e.target.value
-                            }))}
-                            placeholder="Enter country"
-                            className="w-full"
-                            required
+                            onChange={e => handleInputChange(`${qualKey}_country`, e.target.value)}
+                        />
+                        <Input
+                            placeholder="Graduation Year"
+                            value={formData[`${qualKey}_graduation_year`] || ''}
+                            onChange={e => handleInputChange(`${qualKey}_graduation_year`, e.target.value)}
                         />
                     </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor={`${qualKey}_certificate`} className="text-base font-medium flex items-center gap-2">
-                            Academic Certificate/Transcript
-                        </Label>
+                    <div className="space-y-3">
+                        <Label>Certificate (Image/PDF)</Label>
                         <div className="flex items-center gap-4">
-                            <label className="flex-1">
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                                    <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                                    <p className="text-xs text-gray-500 mt-1">PDF, PNG, JPG up to 10MB</p>
-                                </div>
-                                <Input
-                                    type="file"
-                                    accept=".pdf,.png,.jpg,.jpeg"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleFileChange(`${qualKey}_certificate`, file);
-                                    }}
-                                    className="hidden"
-                                    required={false}
-                                />
-                            </label>
-                        </div>
-                        {(selectedFile || existingFile) && (
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <FileIcon className="w-5 h-5 text-blue-600" />
-                                    <span className="text-sm font-medium">
-                    {selectedFile ? selectedFile.name : existingFile?.filename}
-                  </span>
-                                </div>
+                            <Input
+                                type="file"
+                                accept=".pdf,image/*"
+                                onChange={e => {
+                                    const f = e.target.files?.[0];
+                                    if (f) handleFileChange(`${qualKey}_certificate`, f);
+                                }}
+                            />
+                            {(certFile || certMeta) && (
                                 <div className="flex items-center gap-2">
                                     <Button
                                         type="button"
-                                        variant="outline"
                                         size="sm"
-                                        onClick={() => handleFilePreview(selectedFile || existingFile?.filename)}
+                                        variant="secondary"
+                                        onClick={() => handleFilePreview(certMeta?.file_path || certFile)}
                                     >
-                                        <Eye className="w-4 h-4 mr-2" />
-                                        Preview
+                                        <Eye className="w-4 h-4 mr-1" /> Preview
                                     </Button>
                                     <Button
                                         type="button"
-                                        variant="outline"
                                         size="sm"
+                                        variant="destructive"
                                         onClick={() => removeFile(`${qualKey}_certificate`)}
-                                        className="text-red-600 hover:text-red-700"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <X className="w-4 h-4 mr-1" /> Remove
                                     </Button>
                                 </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor={`${qualKey}_testimonial`} className="text-base font-medium flex items-center gap-2">
-                            Academic Testimonial
-                        </Label>
-                        <div className="flex items-center gap-4">
-                            <label className="flex-1">
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                                    <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                                    <p className="text-xs text-gray-500 mt-1">PDF, PNG, JPG up to 10MB</p>
-                                </div>
-                                <Input
-                                    type="file"
-                                    accept=".pdf,.png,.jpg,.jpeg"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleFileChange(`${qualKey}_testimonial`, file);
-                                    }}
-                                    className="hidden"
-                                    required={false}
-                                />
-                            </label>
+                            )}
                         </div>
-                        {(selectedTestimonial || existingTestimonial) && (
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <FileIcon className="w-5 h-5 text-blue-600" />
-                                    <span className="text-sm font-medium">
-                    {selectedTestimonial ? selectedTestimonial.name : existingTestimonial?.filename}
-                  </span>
-                                </div>
+                        {certMeta?.file_path && !certFile && <div className="text-xs text-green-600">Existing file: {certMeta.original_name}</div>}
+                    </div>
+                    <div className="space-y-3">
+                        <Label>Testimonial (Image/PDF)</Label>
+                        <div className="flex items-center gap-4">
+                            <Input
+                                type="file"
+                                accept=".pdf,image/*"
+                                onChange={e => {
+                                    const f = e.target.files?.[0];
+                                    if (f) handleFileChange(`${qualKey}_testimonial`, f);
+                                }}
+                            />
+                            {(testFile || testMeta) && (
                                 <div className="flex items-center gap-2">
                                     <Button
                                         type="button"
-                                        variant="outline"
                                         size="sm"
-                                        onClick={() => handleFilePreview(selectedTestimonial || existingTestimonial?.filename)}
+                                        variant="secondary"
+                                        onClick={() => handleFilePreview(testMeta?.file_path || testFile)}
                                     >
-                                        <Eye className="w-4 h-4 mr-2" />
-                                        Preview
+                                        <Eye className="w-4 h-4 mr-1" /> Preview
                                     </Button>
                                     <Button
                                         type="button"
-                                        variant="outline"
                                         size="sm"
+                                        variant="destructive"
                                         onClick={() => removeFile(`${qualKey}_testimonial`)}
-                                        className="text-red-600 hover:text-red-700"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <X className="w-4 h-4 mr-1" /> Remove
                                     </Button>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
+                        {testMeta?.file_path && !testFile && <div className="text-xs text-green-600">Existing file: {testMeta.original_name}</div>}
                     </div>
                 </div>
             );
         }
-
         return null;
     };
 
-    const shouldShowQuestion = (question: Question) => {
-        if (!question.conditional_logic) return true;
-        const { question_id, value } = question.conditional_logic;
-        const dependentValue = formData[`question_${question_id}`];
-        return dependentValue === value;
-    };
-
     const renderField = (question: Question) => {
-        const value = formData[`question_${question.id}`] || '';
+        const value = formData[`question_${question.id}`];
         const fieldId = `question_${question.id}`;
-        const safeOptions = Array.isArray(question.options)
-            ? question.options
+        const safeOptions: string[] = Array.isArray(question.options)
+            ? question.options as string[]
             : typeof question.options === 'string'
-                ? JSON.parse(question.options)
+                ? safeJsonParse<string[]>(question.options as string, [])
                 : [];
-
-        // Check if this is a qualification type question
-        const isQualificationType = question.question_text.toLowerCase().includes('qualification type') ||
+        const isQualificationType =
+            question.question_text.toLowerCase().includes('qualification type') ||
             question.question_text.toLowerCase().includes('certificate type');
 
         switch (question.question_type) {
@@ -1382,258 +1525,226 @@ export default function MultiStepperForm() {
             case 'email':
             case 'phone':
             case 'tel':
-                return (
-                    <Input
-                        id={fieldId}
-                        type={question.question_type === 'phone' || question.question_type === 'tel' ? 'tel' : question.question_type}
-                        value={value}
-                        onChange={(e) => handleInputChange(question.id, e.target.value)}
-                        placeholder={`Enter your ${question.question_text.toLowerCase()}`}
-                        className="w-full"
-                        required={question.is_required}
-                    />
-                );
-
-            case 'textarea':
-                return (
-                    <Textarea
-                        id={fieldId}
-                        value={value}
-                        onChange={(e) => handleInputChange(question.id, e.target.value)}
-                        placeholder={`Enter ${question.question_text.toLowerCase()}`}
-                        rows={4}
-                        className="w-full"
-                        required={question.is_required}
-                    />
-                );
-
             case 'date':
-                return (
-                    <Input
-                        id={fieldId}
-                        type="date"
-                        value={value}
-                        onChange={(e) => handleInputChange(question.id, e.target.value)}
-                        className="w-full"
-                        required={question.is_required}
-                    />
-                );
-
             case 'number':
                 return (
                     <Input
-                        id={fieldId}
-                        type="number"
-                        value={value}
-                        onChange={(e) => handleInputChange(question.id, e.target.value)}
-                        placeholder={`Enter ${question.question_text.toLowerCase()}`}
-                        className="w-full"
-                        required={question.is_required}
+                        type={question.question_type === 'text' ? 'text' : question.question_type === 'phone' ? 'tel' : question.question_type}
+                        value={value || ''}
+                        onChange={e => handleInputChange(question.id, e.target.value)}
+                        placeholder={question.question_text}
                     />
                 );
-
+            case 'textarea':
+                return (
+                    <Textarea
+                        value={value || ''}
+                        onChange={e => handleInputChange(question.id, e.target.value)}
+                        placeholder={question.question_text}
+                    />
+                );
             case 'single_select':
                 return (
-                    <div>
+                    <div className="space-y-2">
                         <Select
-                            value={value}
-                            onValueChange={(selectedValue) =>
-                                isQualificationType
-                                    ? handleQualificationChange(question.id, selectedValue)
-                                    : handleInputChange(question.id, selectedValue)
-                            }
+                            value={value || ''}
+                            onValueChange={v => {
+                                if (isQualificationType) handleQualificationChange(question.id, v);
+                                else handleInputChange(question.id, v);
+                            }}
                         >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select an option" />
-                            </SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder="Select option" /></SelectTrigger>
                             <SelectContent>
-                                {safeOptions.map((option: string) => (
-                                    <SelectItem key={option} value={option}>
-                                        {option}
-                                    </SelectItem>
-                                ))}
+                                {safeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
                             </SelectContent>
                         </Select>
-
-                        {isQualificationType && (['WASSCE', 'A-Level', 'Degree', 'Diploma', 'Certificate'].includes(value)) && renderQualificationResults(question)}
+                        {isQualificationType && renderQualificationResults(question)}
                     </div>
                 );
-
             case 'multiple_select': {
-                const selectedValues = Array.isArray(value) ? value : [];
+                const selectedValues: string[] = Array.isArray(value) ? value : [];
                 return (
                     <div className="space-y-2">
-                        {safeOptions.map((option: string, idx: number) => (
-                            <label key={idx} className="flex items-center space-x-2">
-                                <Checkbox
-                                    checked={selectedValues.includes(option)}
-                                    onCheckedChange={(checked) => {
-                                        if (checked) {
-                                            handleInputChange(question.id, [...selectedValues, option]);
-                                        } else {
-                                            handleInputChange(question.id, selectedValues.filter(v => v !== option));
-                                        }
-                                    }}
-                                />
-                                <span>{option}</span>
-                            </label>
-                        ))}
+                        <div className="flex flex-wrap gap-2">
+                            {safeOptions.map(opt => {
+                                const checked = selectedValues.includes(opt);
+                                return (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => {
+                                            let next: string[];
+                                            if (checked) next = selectedValues.filter(v => v !== opt);
+                                            else next = [...selectedValues, opt];
+                                            handleInputChange(question.id, next);
+                                        }}
+                                        className={`px-3 py-1 rounded border text-sm ${checked ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-gray-50'}`}
+                                    >
+                                        {opt}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 );
             }
-
             case 'file': {
                 const selectedFile = files[fieldId];
                 const existingFile = filesMetadata[fieldId];
                 return (
                     <div className="space-y-3">
-                        <div className="flex items-center gap-4">
-                            <label className="flex-1">
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                                    <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                                    <p className="text-xs text-gray-500 mt-1">PDF, PNG, JPG up to 10MB</p>
-                                </div>
-                                <Input
-                                    type="file"
-                                    accept=".pdf,.png,.jpg,.jpeg"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleFileChange(question.id, file);
-                                    }}
-                                    className="hidden"
-                                    required={question.is_required && !(selectedFile || existingFile)}
-                                />
-                            </label>
-                        </div>
+                        <Input
+                            type="file"
+                            onChange={e => {
+                                const f = e.target.files?.[0];
+                                if (f) handleFileChange(question.id, f);
+                            }}
+                        />
                         {(selectedFile || existingFile) && (
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <FileIcon className="w-5 h-5 text-blue-600" />
-                                    <span className="text-sm font-medium">
-                    {selectedFile ? selectedFile.name : existingFile?.filename}
-                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleFilePreview(selectedFile || existingFile?.filename)}
-                                    >
-                                        <Eye className="w-4 h-4 mr-2" />
-                                        Preview
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => removeFile(question.id)}
-                                        className="text-red-600 hover:text-red-700"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </Button>
-                                </div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                {selectedFile && (
+                                    <div className="flex items-center gap-2 bg-yellow-100 px-2 py-1 rounded">
+                                        <FileIcon className="w-4 h-4" />
+                                        <span className="text-xs">{selectedFile.name}</span>
+                                        <span className="text-xs text-orange-600">(Uploading...)</span>
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => handleFilePreview(selectedFile)}
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => removeFile(question.id)}
+                                        >
+                                            <X className="w-4 h-4 text-red-500" />
+                                        </Button>
+                                    </div>
+                                )}
+                                {!selectedFile && existingFile && (
+                                    <div className="flex items-center gap-2 bg-emerald-50 px-2 py-1 rounded">
+                                        <FileIcon className="w-4 h-4 text-emerald-600" />
+                                        <span className="text-xs">{existingFile.original_name}</span>
+                                        <span className="text-xs text-green-600">✓ Uploaded</span>
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => handleFilePreview(existingFile.file_path || existingFile.filename)}
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => removeFile(question.id)}
+                                        >
+                                            <X className="w-4 h-4 text-red-500" />
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
                 );
             }
-
             case 'table': {
-                const tableData = Array.isArray(value) ? value : [];
+                const tableData: TableRowData[] = Array.isArray(value) ? value : [];
                 const columns = question.table_columns || [];
-                const isEmploymentHistory = question.question_text.toLowerCase().includes('employment history');
+                const isEmployment = question.question_text.toLowerCase().includes('employment history');
                 return (
                     <div className="space-y-4">
-                        <Table className="border">
-                            <TableHeader>
-                                <TableRow>
-                                    {columns.map((column) => (
-                                        <TableHead key={column.name}>
-                                            {column.name}
-                                            {column.is_required && <span className="text-red-500">*</span>}
-                                        </TableHead>
-                                    ))}
-                                    <TableHead>Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {tableData.map((row: TableRow, rowIndex: number) => (
-                                    <TableRow key={rowIndex}>
-                                        {columns.map((column) => (
-                                            <TableCell key={column.name}>
-                                                {column.type === 'select' ? (
-                                                    <Select
-                                                        value={row[column.name] || ''}
-                                                        onValueChange={(value) => handleTableInputChange(question.id, rowIndex, column.name, value)}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {column.options?.map((option: string) => (
-                                                                <SelectItem key={option} value={option}>
-                                                                    {option}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                ) : column.type === 'textarea' ? (
-                                                    <Textarea
-                                                        value={row[column.name] || ''}
-                                                        onChange={(e) => handleTableInputChange(question.id, rowIndex, column.name, e.target.value)}
-                                                        rows={2}
-                                                    />
-                                                ) : (
-                                                    <Input
-                                                        type={column.type === 'number' ? 'number' : column.type === 'date' ? 'date' : column.type === 'email' ? 'email' : column.type === 'tel' ? 'tel' : 'text'}
-                                                        value={row[column.name] || ''}
-                                                        onChange={(e) => handleTableInputChange(question.id, rowIndex, column.name, e.target.value)}
-                                                        required={column.is_required}
-                                                    />
-                                                )}
-                                            </TableCell>
+                        <div className="overflow-x-auto border rounded">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        {columns.map(c => (
+                                            <TableHead key={c.id}>
+                                                {c.name} {c.is_required && <span className="text-red-500">*</span>}
+                                            </TableHead>
                                         ))}
-                                        <TableCell>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => removeTableRow(question.id, rowIndex)}
-                                                className="text-red-600 hover:text-red-700"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </TableCell>
+                                        <TableHead className="w-10"></TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {tableData.map((row, rowIdx) => (
+                                        <TableRow key={rowIdx}>
+                                            {columns.map(c => (
+                                                <TableCell key={c.id}>
+                                                    {c.type === 'select' && c.options ? (
+                                                        <Select
+                                                            value={row[c.name] || ''}
+                                                            onValueChange={v => handleTableInputChange(question.id, rowIdx, c.name, v)}
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder={`Select ${c.name}`} />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {(Array.isArray(c.options) ? c.options : []).map(opt => (
+                                                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    ) : c.type === 'textarea' ? (
+                                                        <Textarea
+                                                            value={row[c.name] || ''}
+                                                            onChange={e => handleTableInputChange(question.id, rowIdx, c.name, e.target.value)}
+                                                            placeholder={c.name}
+                                                        />
+                                                    ) : (
+                                                        <Input
+                                                            value={row[c.name] || ''}
+                                                            onChange={e => handleTableInputChange(question.id, rowIdx, c.name, e.target.value)}
+                                                            placeholder={c.name}
+                                                        />
+                                                    )}
+                                                </TableCell>
+                                            ))}
+                                            <TableCell>
+                                                <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    onClick={() => removeTableRow(question.id, rowIdx)}
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {!tableData.length && (
+                                        <TableRow>
+                                            <TableCell colSpan={columns.length + 1} className="text-center text-sm text-muted-foreground">
+                                                No entries
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => addTableRow(question.id, columns)}
-                            disabled={isEmploymentHistory && tableData.length >= 3}
-                            className="flex items-center gap-2"
+                            size="sm"
+                            onClick={() => addTableRow(question.id, columns.map(c => ({ name: c.name })))}
+                            disabled={isEmployment && tableData.length >= 3}
                         >
-                            <Plus className="w-4 h-4" />
-                            {isEmploymentHistory ? 'Add Employment' : 'Add Row'}
+                            <Plus className="w-4 h-4 mr-1" /> Add Row
                         </Button>
                     </div>
                 );
             }
-
             default:
                 return (
                     <Input
-                        id={fieldId}
-                        type="text"
-                        value={value}
-                        onChange={(e) => handleInputChange(question.id, e.target.value)}
-                        placeholder={`Enter ${question.question_text.toLowerCase()}`}
-                        className="w-full"
-                        required={question.is_required}
+                        value={value || ''}
+                        onChange={e => handleInputChange(question.id, e.target.value)}
+                        placeholder={question.question_text}
                     />
                 );
         }
@@ -1649,243 +1760,260 @@ export default function MultiStepperForm() {
 
     if (submittedApplication && !isEditMode) {
         return (
-            <div className="max-w-4xl mx-auto space-y-6">
+            <div className="max-w-4xl mx-auto p-6">
                 <Card>
-                    <CardHeader className="bg-green-50 border-b">
-                        <CardTitle className="text-2xl text-green-800 flex items-center gap-3">
-                            <Check className="w-8 h-8" />
-                            Application Submitted Successfully
+                    <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                            <div>
+                                <div className="text-xl">Submitted Application</div>
+                                <div className="text-sm text-muted-foreground mt-1">
+                                    Application ID: {applicationNumber || submittedApplication.application_number || submittedApplication.id}
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={handlePrint}>
+                                    <Printer className="w-4 h-4 mr-1" /> Print
+                                </Button>
+                                <Button variant="secondary" size="sm" onClick={handleEditApplication}>
+                                    <Edit className="w-4 h-4 mr-1" /> Edit Application
+                                </Button>
+                            </div>
                         </CardTitle>
-                        <p className="text-green-600">
-                            Submitted on: {submittedApplication.submitted_at ? new Date(submittedApplication.submitted_at).toLocaleDateString() : 'Unknown date'}
-                        </p>
                     </CardHeader>
-                    <CardContent className="p-6">
-                        <div className="flex gap-4 mb-6">
-                            <Button onClick={handleEditApplication} className="flex items-center gap-2">
-                                <Edit className="w-4 h-4" />
-                                Edit Application
-                            </Button>
-                            <Button onClick={handlePrint} variant="outline" className="flex items-center gap-2">
-                                <Printer className="w-4 h-4" />
-                                Print Application
-                            </Button>
-                        </div>
-
-                        <div ref={printRef}>
-                            <h2 className="text-xl font-bold mb-4">Application Details</h2>
-                            {submittedApplication.categories ? (
-                                Object.keys(submittedApplication.categories).map(categoryName => (
-                                    <div key={categoryName} className="category mb-6">
-                                        <h3 className="category-title">{categoryName}</h3>
-                                        {submittedApplication.categories[categoryName].map((response: any) => (
-                                            <div key={response.question_id} className="question">
-                                                <div className="question-text">{response.question_text}</div>
-                                                <div className="answer">
-                                                    {response.file_path ? (
-                                                        <span className="file-info">File: {response.file_path}</span>
-                                                    ) : (
-                                                        response.answer || 'No answer provided'
-                                                    )}
-                                                </div>
+                    <CardContent ref={printRef} className="space-y-8">
+                        {Object.entries(submittedApplication.categories).map(([cat, answers]) => (
+                            <div key={cat}>
+                                <h2 className="font-semibold text-lg mb-3">{cat}</h2>
+                                <div className="space-y-4">
+                                    {answers.map(a => {
+                                        const question = categories
+                                            .flatMap(c => c.questions)
+                                            .find(q => q.id === a.question_id);
+                                        return (
+                                            <div key={a.question_id} className="border rounded p-3">
+                                                <div className="text-sm font-medium mb-1">{a.question_text}</div>
+                                                {a.question_type === 'file' && a.file_path ? (
+                                                    <div className="flex items-center gap-3 flex-wrap">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleFilePreview(a.file_path)}
+                                                        >
+                                                            <Eye className="w-4 h-4 mr-1" /> View
+                                                        </Button>
+                                                        <span className="text-xs break-all">{extractFilename(a.file_path)}</span>
+                                                    </div>
+                                                ) : a.question_type === 'multiple_select' ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {safeJsonParse<string[]>(a.answer, []).map(v => (
+                                                            <span key={v} className="px-2 py-0.5 rounded bg-gray-100 text-xs">{v}</span>
+                                                        ))}
+                                                    </div>
+                                                ) : a.question_type === 'table' && question ? (
+                                                    <div className="overflow-x-auto">
+                                                        {(() => {
+                                                            const rows = safeJsonParse<TableRowData[]>(a.answer, []);
+                                                            if (!rows.length) return <em className="text-xs text-muted-foreground">No rows</em>;
+                                                            const cols = question.table_columns || [];
+                                                            return (
+                                                                <Table className="w-full text-xs border">
+                                                                    <TableHeader>
+                                                                        <TableRow>
+                                                                            {cols.map(c => (
+                                                                                <TableHead key={c.id} className="border px-1 py-0.5 text-left">{c.name}</TableHead>
+                                                                            ))}
+                                                                        </TableRow>
+                                                                    </TableHeader>
+                                                                    <TableBody>
+                                                                        {rows.map((r, i) => (
+                                                                            <TableRow key={i}>
+                                                                                {cols.map(c => (
+                                                                                    <TableCell key={c.id} className="border px-1 py-0.5">{r[c.name] || ''}</TableCell>
+                                                                                ))}
+                                                                            </TableRow>
+                                                                        ))}
+                                                                    </TableBody>
+                                                                </Table>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm whitespace-pre-wrap">{a.answer || <span className="text-muted-foreground">—</span>}</div>
+                                                )}
                                             </div>
-                                        ))}
-                                    </div>
-                                ))
-                            ) : (
-                                <p>No application data available</p>
-                            )}
-                        </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
+
+                <Dialog open={!!previewFile?.url} onOpenChange={() => setPreviewFile({ url: '', type: '' })}>
+                    <DialogContent className="max-w-4xl">
+                        <DialogHeader>
+                            <DialogTitle>File Preview</DialogTitle>
+                        </DialogHeader>
+                        {previewFile.type === 'image' && (
+                            <img src={previewFile.url} alt={previewFile.name} className="w-full h-auto max-h-[70vh] object-contain" />
+                        )}
+                        {previewFile.type === 'pdf' && (
+                            <iframe src={previewFile.url} title="File Preview" className="w-full h-[70vh]" />
+                        )}
+                        {previewFile.url && !['image','pdf'].includes(previewFile.type) && (
+                            <a href={previewFile.url} target="_blank" rel="noreferrer" className="text-blue-600 underline text-sm">
+                                Download File
+                            </a>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </div>
         );
     }
-
-    if (categories.length === 0 || !categories[currentStep]) {
-        return (
-            <div className="text-center py-8">
-                <p className="text-gray-500">Loading application form...</p>
-            </div>
-        );
-    }
-
-    const currentCategory = categories[currentStep];
-    const progress = ((currentStep + 1) / categories.length) * 100;
-    const isLastStep = currentStep === categories.length - 1;
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+        <div className="max-w-4xl mx-auto p-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-2xl flex items-center justify-between">
+                        <div>
+                            <div>{categories[currentStep]?.name || 'Application Form'}</div>
+                            {applicationNumber && (
+                                <div className="text-sm text-muted-foreground mt-1">
+                                    Application ID: {applicationNumber}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => saveProgress()}
+                                disabled={isSaving}
+                            >
+                                <Save className="w-4 h-4 mr-1" /> {isSaving ? 'Saving...' : 'Save'}
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={handlePrint}
+                            >
+                                <Printer className="w-4 h-4 mr-1" /> Print
+                            </Button>
+                        </div>
+                    </CardTitle>
+                    <div className="flex items-center justify-between mt-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            {categories.map((c, i) => {
+                                const done = completedSteps.includes(i);
+                                const active = i === currentStep;
+                                return (
+                                    <button
+                                        key={c.name}
+                                        onClick={() => goToStep(i)}
+                                        className={`px-3 py-1 rounded text-xs font-medium border flex items-center gap-1
+                      ${active ? 'bg-blue-600 text-white border-blue-600'
+                                            : done ? 'bg-green-100 text-green-700 border-green-300'
+                                                : 'bg-white hover:bg-gray-50'}
+                    `}
+                                    >
+                                        {done ? <Check className="w-3 h-3" /> : i + 1}
+                                        <span className="truncate max-w-[110px]">{c.name}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Clock className="w-4 h-4" />
+                                {lastSaved ? <>Last Saved: {new Date(lastSaved).toLocaleTimeString()}</> : 'Not yet saved'}
+                            </div>
+                            <div className="flex items-center gap-1 text-xs">
+                                <Checkbox
+                                    checked={autoSaveEnabled}
+                                    onCheckedChange={v => setAutoSaveEnabled(!!v)}
+                                    id="autosave"
+                                />
+                                <label htmlFor="autosave">Auto-Save</label>
+                            </div>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <form className="space-y-6">
+                        {categories[currentStep]?.questions
+                            .filter(shouldShowQuestion)
+                            .map(q => (
+                                <div key={q.id} className="space-y-2">
+                                    <Label className="font-medium text-sm flex items-center gap-1">
+                                        {q.question_text}
+                                        {q.is_required && <span className="text-red-500">*</span>}
+                                    </Label>
+                                    {renderField(q)}
+                                </div>
+                            ))}
+                    </form>
+                    <div className="flex justify-between mt-8">
+                        <Button
+                            type="button"
+                            onClick={prevStep}
+                            disabled={currentStep === 0}
+                            variant="outline"
+                            className="flex items-center gap-2"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                            Previous
+                        </Button>
+                        {currentStep < categories.length - 1 ? (
+                            <Button
+                                type="button"
+                                onClick={nextStep}
+                                disabled={!canProceed}
+                                className="flex items-center gap-2"
+                            >
+                                Next
+                                <ChevronRight className="w-4 h-4" />
+                            </Button>
+                        ) : (
+                            <Button
+                                type="button"
+                                disabled={!canProceed || isSubmitting}
+                                onClick={submitApplication}
+                                className="flex items-center gap-2"
+                            >
+                                {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                                {!isSubmitting && <Check className="w-4 h-4" />}
+                            </Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Dialog open={!!previewFile?.url} onOpenChange={() => setPreviewFile({ url: '', type: '' })}>
+                <DialogContent className="max-w-4xl">
                     <DialogHeader>
                         <DialogTitle>File Preview</DialogTitle>
                     </DialogHeader>
-                    {previewFile && (
-                        <div className="flex justify-center">
-                            {previewFile.type === 'image' ? (
-                                <img src={previewFile.url} alt="Preview" className="max-w-full h-auto" />
-                            ) : (
-                                <iframe
-                                    src={previewFile.url}
-                                    className="w-full h-96 border"
-                                    title="PDF Preview"
-                                />
-                            )}
-                        </div>
+                    {previewFile.type === 'image' && (
+                        <img
+                            src={previewFile.url}
+                            alt={previewFile.name}
+                            className="w-full h-auto max-h-[70vh] object-contain"
+                        />
+                    )}
+                    {previewFile.type === 'pdf' && (
+                        <iframe src={previewFile.url} title="File Preview" className="w-full h-[70vh]" />
+                    )}
+                    {previewFile.url && !['image','pdf'].includes(previewFile.type) && (
+                        <a href={previewFile.url} target="_blank" rel="noreferrer" className="text-blue-600 underline text-sm">
+                            Download File
+                        </a>
                     )}
                 </DialogContent>
             </Dialog>
-
-            <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                ></div>
-            </div>
-
-            <div className="flex justify-between items-center text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    {lastSaved ? (
-                        <span>Last saved: {new Date(lastSaved).toLocaleString()}</span>
-                    ) : (
-                        <span>No progress saved yet</span>
-                    )}
-                </div>
-                <div className="flex gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => saveProgress(true)}
-                        disabled={isSaving}
-                        className="flex items-center gap-2"
-                    >
-                        <Save className="w-4 h-4" />
-                        {isSaving ? 'Saving...' : 'Save Progress'}
-                    </Button>
-                    {isLastStep && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handlePrint}
-                            className="flex items-center gap-2"
-                        >
-                            <Printer className="w-4 h-4" />
-                            Print Form
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            <div className="flex justify-between mb-8 overflow-x-auto pb-4">
-                {categories.map((category, index) => {
-                    if (!category) return null;
-
-                    const isCompleted = completedSteps.includes(index);
-                    const isCurrent = currentStep === index;
-                    const isAccessible = index <= currentStep || completedSteps.includes(index);
-
-                    return (
-                        <div
-                            key={category.name || index}
-                            className={`flex flex-col items-center cursor-pointer min-w-0 flex-1 px-2 ${
-                                isAccessible ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
-                            }`}
-                            onClick={() => isAccessible && goToStep(index)}
-                        >
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                                isCompleted
-                                    ? 'bg-green-500 text-white'
-                                    : isCurrent
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-300 text-gray-600'
-                            }`}>
-                                {isCompleted ? <Check className="w-5 h-5" /> : index + 1}
-                            </div>
-                            <span className={`text-xs mt-2 text-center font-medium ${
-                                isCurrent ? 'text-blue-600' : 'text-gray-600'
-                            }`}>
-                {category.name || `Step ${index + 1}`}
-              </span>
-                        </div>
-                    );
-                })}
-            </div>
-
-            <div ref={printRef} className="print-content">
-                <Card className="border border-gray-200 shadow-sm">
-                    <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-100">
-                        <CardTitle className="text-2xl text-gray-800 flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                completedSteps.includes(currentStep) ? 'bg-green-500 text-white' : 'bg-blue-600 text-white'
-                            }`}>
-                                {completedSteps.includes(currentStep) ? <Check className="w-5 h-5" /> : currentStep + 1}
-                            </div>
-                            {currentCategory.name}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <form className="space-y-6">
-                            {currentCategory.questions
-                                .filter(question => shouldShowQuestion(question))
-                                .map((question) => (
-                                    <div key={question.id} className="space-y-2">
-                                        <Label
-                                            htmlFor={`question_${question.id}`}
-                                            className="text-base font-medium flex items-center gap-2"
-                                        >
-                                            {question.question_text}
-                                            {question.is_required && <span className="text-red-500">*</span>}
-                                        </Label>
-                                        {renderField(question)}
-                                    </div>
-                                ))}
-                        </form>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="flex justify-between items-center mt-6">
-                <Button
-                    variant="outline"
-                    onClick={prevStep}
-                    disabled={currentStep === 0}
-                    className="flex items-center gap-2"
-                >
-                    <ChevronLeft className="w-4 h-4" />
-                    Previous
-                </Button>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <Checkbox
-                            id="auto-save"
-                            checked={autoSaveEnabled}
-                            onCheckedChange={(checked) => setAutoSaveEnabled(!!checked)}
-                        />
-                        <Label htmlFor="auto-save">Auto-save progress</Label>
-                    </div>
-                    {isLastStep ? (
-                        <Button
-                            onClick={submitApplication}
-                            disabled={isSubmitting || !canProceed}
-                            className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white"
-                        >
-                            <Check className="w-4 h-4" />
-                            {isSubmitting ? 'Submitting...' : 'Submit Application'}
-                        </Button>
-                    ) : (
-                        <Button
-                            onClick={nextStep}
-                            disabled={!canProceed}
-                            className="flex items-center gap-2"
-                        >
-                            Next
-                            <ChevronRight className="w-4 h-4" />
-                        </Button>
-                    )}
-                </div>
-            </div>
         </div>
     );
 }

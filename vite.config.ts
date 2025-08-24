@@ -12,7 +12,20 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      // '/api': 'https://backend.msn.edu.sl',
+      //   '/api': {
+      //       target: 'https://backend.msn.edu.sl',
+      //       changeOrigin: true,
+      //       secure: false, // Set to true if using HTTPS
+      //       rewrite: (path) => path.replace(/^\/api/, ''),
+      //   },
+      //
+      //   '/api': {
+      //       target: 'http://localhost:8000', // Replace with your actual backend URL
+      //       changeOrigin: true,
+      //       secure: false, // Set to true if using HTTPS
+      //       rewrite: (path) => path.replace(/^\/api/, ''),
+      //   },
     },
   },
 })

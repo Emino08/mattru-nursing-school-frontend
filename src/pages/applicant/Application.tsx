@@ -1,12 +1,28 @@
+import { useState } from 'react';
 import MultiStepForm from '@/components/forms/MultiStepForm';
+import PinAuthentication from '@/components/PinAuthentication';
 
 export default function Application() {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [paymentData, setPaymentData] = useState(null);
+
+    const handleAuthSuccess = (authData: any) => {
+        setIsAuthenticated(true);
+        setPaymentData(authData.paymentData);
+    };
+
+    // Show PIN authentication if not authenticated
+    if (!isAuthenticated) {
+        return <PinAuthentication onAuthSuccess={handleAuthSuccess} />;
+    }
+
+    // Show application form after successful authentication
     return (
         <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-semibold text-gray-800">New Application</h2>
-                <div className="bg-blue-100 text-primary px-3 py-1 rounded-full text-sm font-medium">
-                    Submit application
+                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
+                    PIN Verified ✓
                 </div>
             </div>
 
@@ -18,7 +34,7 @@ export default function Application() {
                     </p>
                 </div>
                 <div className="p-6">
-                    <MultiStepForm />
+                    <MultiStepForm paymentData={paymentData} />
                 </div>
             </div>
         </div>
