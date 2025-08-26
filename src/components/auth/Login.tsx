@@ -49,13 +49,8 @@ export default function Login() {
                 description: 'Redirecting to your dashboard...'
             });
 
-                const redirectPath = getRedirectPath(user);
-                navigate(redirectPath, { replace: true });
-            // Use setTimeout to ensure state updates are complete
-            // setTimeout(() => {
-            //     const redirectPath = getRedirectPath(user);
-            //     navigate(redirectPath, { replace: true });
-            // }, 100);
+            const redirectPath = getRedirectPath(user);
+            navigate(redirectPath, { replace: true });
 
         } catch (error: unknown) {
             console.error('Login error:', error);
@@ -81,7 +76,7 @@ export default function Login() {
             setIsSubmitting(false);
         }
     };
-    // Show loading state with enhanced design
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -101,7 +96,6 @@ export default function Login() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 relative overflow-hidden">
-            {/* Background decorative elements */}
             <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-blue-100/30 to-transparent rounded-full transform rotate-12"></div>
                 <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-purple-100/30 to-transparent rounded-full transform -rotate-12"></div>
@@ -111,10 +105,48 @@ export default function Login() {
 
             <div className="w-full max-w-md relative z-10">
                 <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-8 relative overflow-hidden">
-                    {/* Subtle inner glow */}
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/50 rounded-3xl"></div>
 
                     <div className="relative z-10">
+                        {/* Logo and School Header */}
+                        <div className="flex items-center justify-center gap-4 mb-8">
+                            <div className="relative">
+                                <img
+                                    src="https://msn.edu.sl/nursingschoollogo.jpg"
+                                    alt="Mattru School of Nursing Logo"
+                                    className="w-20 h-20 rounded-2xl shadow-xl border-2 border-white/50 backdrop-blur-sm transform hover:scale-105 transition-all duration-300"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-2xl"></div>
+                            </div>
+                            <div className="text-center">
+                                <h3 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent drop-shadow-md tracking-wide leading-tight">
+                                    Mattru School of Nursing
+                                </h3>
+                                <div className="w-32 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 mx-auto mt-1 rounded-full"></div>
+                            </div>
+                        </div>
+
+                        {/* Welcome Message */}
+                        <div className="text-center mb-8 p-6 bg-gradient-to-r from-blue-50/80 via-purple-50/80 to-pink-50/80 rounded-2xl border border-blue-200/30 backdrop-blur-sm">
+                            <h2 className="text-xl font-bold text-gray-800 mb-3">
+                                Welcome to Our Application Portal
+                            </h2>
+                            <p className="text-gray-700 leading-relaxed text-sm">
+                                For new applicants: Please{' '}
+                                <Link
+                                    to="/register"
+                                    className="font-semibold text-purple-600 hover:text-purple-800 underline decoration-purple-300 hover:decoration-purple-500 transition-all duration-200"
+                                >
+                                    create a new account
+                                </Link>
+                                {' '}and verify your email before logging in.
+                            </p>
+                            <div className="flex items-center justify-center gap-2 mt-3 text-sm text-gray-600">
+                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                <span>Secure • Verified • Trusted</span>
+                            </div>
+                        </div>
+
                         {/* Header Section */}
                         <div className="text-center mb-10">
                             <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 rounded-3xl flex items-center justify-center mb-6 shadow-xl transform rotate-3 hover:rotate-0 transition-all duration-500 hover:scale-110">
@@ -127,7 +159,8 @@ export default function Login() {
                             <div className="w-24 h-1.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mx-auto mt-4 shadow-sm"></div>
                         </div>
 
-                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-7" noValidate>                            {/* Email Field */}
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-7" noValidate>
+                            {/* Email Field */}
                             <div className="space-y-3">
                                 <Label className="text-gray-800 font-semibold flex items-center gap-2 text-sm" htmlFor="email">
                                     <Mail className="w-4 h-4 text-blue-600" />
@@ -284,9 +317,7 @@ export default function Login() {
                 {/* Bottom decorative element */}
                 <div className="text-center mt-8">
                     <p className="text-sm text-gray-500/80 backdrop-blur-sm">
-                        © {
-                        new Date().getFullYear()
-                    } Mattru Nursing School. All rights reserved.
+                        © {new Date().getFullYear()} Mattru Nursing School. All rights reserved.
                     </p>
                 </div>
             </div>

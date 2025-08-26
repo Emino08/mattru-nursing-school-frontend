@@ -2,9 +2,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:8000',
+    // baseURL: 'http://localhost:8000',
     // baseURL: '/api',
-    // baseURL:'https://backend.msn.edu.sl/',
+    baseURL:'https://backend.msn.edu.sl/',
     headers: {
         'Content-Type': 'application/json',
         // 'Accept': 'application/json',
